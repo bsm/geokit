@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/bsm/geokit/geo"
 	osm "github.com/glaslos/go-osm"
+	"github.com/golang/geo/s2"
 )
 
 // Map wraps osm.Map.
@@ -58,15 +58,13 @@ func (m *Map) FindWay(id int64) (*osm.Way, error) {
 	return nil, fmt.Errorf("osmx: way #%d not found", id)
 }
 
-// GeneratePolygon parses and constructs a Polygon from the map.
-func (m *Map) GeneratePolygon() (geo.Polygon, error) {
+// ExtractLoops extracts and generates (outer) loops from the map.
+func (m *Map) ExtractLoops() ([]s2.Loop, error) {
 	ml, err := m.makeLineMap()
 	if err != nil {
 		return nil, err
 	}
-
-	lps, err := ml.Loops()
-	return geo.Polygon(lps), err
+	return ml.Loops()
 }
 
 // --------------------------------------------------------------------
