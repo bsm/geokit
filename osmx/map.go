@@ -1,6 +1,7 @@
 package osmx
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 
@@ -17,11 +18,24 @@ type Map struct {
 // WrapMap initialises Map and sorts indexes
 // for further processing.
 func WrapMap(parent *osm.Map) (*Map, error) {
-	if len(parent.Relations) != 1 {
-		return nil, fmt.Errorf("map contains %d relations", len(parent.Relations))
+	if len(parent.Relations) == 0 {
+		return nil, errors.New("osmx: map contains no relations")
 	}
 
-	m := &Map{Map: parent, rel: parent.Relations[0]}
+	// Get first relation that has ways
+	var m *Map
+	for _, rel := range parent.Relations {
+		for _, mem := range rel.Members {
+			if mem.Type == "way" {
+				m = &Map{Map: parent, rel: rel}
+				break
+			}
+		}
+	}
+	if m == nil {
+		return nil, errors.New("osmx: map contains no valid relations")
+	}
+
 	sort.Slice(m.Nodes, func(i, j int) bool { return m.Nodes[i].ID < m.Nodes[j].ID })
 	sort.Slice(m.Ways, func(i, j int) bool { return m.Ways[i].ID < m.Ways[j].ID })
 	return m, nil
