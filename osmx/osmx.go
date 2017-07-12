@@ -3,6 +3,7 @@ package osmx
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/bsm/geokit/geo"
 	osm "github.com/glaslos/go-osm"
@@ -75,12 +76,19 @@ func (l *Line) Loop() *s2.Loop {
 	}
 	// Check the direction of the points and
 	// reverse the direction if clockwise.
-	if dir := s2.RobustSign(pts[0], pts[1], pts[2]); dir == s2.Clockwise {
+	lp := s2.LoopFromPoints(pts)
+	// The loop is assumed clockwise
+	// if its bounding rectangle is over
+	// 50% of the unit sphere's
+	// surface area. No country exceeds this.
+	// NOTE: Complex loops' orientations
+	// cannot be determined with s2.RobustSign.
+	if lp.RectBound().Area() >= 2*math.Pi {
 		poly := s2.Polyline(pts)
 		poly.Reverse()
 	}
 
-	return s2.LoopFromPoints(pts)
+	return lp
 }
 
 func (l *Line) reversePath() []*osm.Node {
