@@ -38,4 +38,26 @@ var _ = Describe("Map", func() {
 			Members: []osm.Member{{Type: "way"}},
 		}))
 	})
+
+	It("should retrieve alpha2", func() {
+		subject = &Map{
+			rel: osm.Relation{
+				Tags: []osm.Tag{
+					{Key: "ISO3166-1:alpha2", Value: "GB"},
+				},
+			},
+		}
+		Expect(subject.CountryAlpha2()).To(Equal("GB"))
+	})
+
+	It("should retrieve alpha3", func() {
+		subject = &Map{
+			rel: osm.Relation{
+				Tags: []osm.Tag{
+					{Key: "ISO3166-1:alpha3", Value: "GBR"},
+				},
+			},
+		}
+		Expect(subject.CountryAlpha3()).To(Equal("GBR"))
+	})
 })
