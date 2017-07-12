@@ -61,6 +61,35 @@ var _ = Describe("Line", func() {
 		Expect(pts[1].ApproxEqual(s2.PointFromLatLng(s2.LatLngFromDegrees(37, -109)))).To(BeTrue())
 		Expect(pts[2].ApproxEqual(s2.PointFromLatLng(s2.LatLngFromDegrees(37, -102)))).To(BeTrue())
 		Expect(pts[3].ApproxEqual(s2.PointFromLatLng(s2.LatLngFromDegrees(41, -102)))).To(BeTrue())
+
+		Expect(loop.ContainsOrigin()).To(BeFalse())
+	})
+
+	It("should construct orientation-invariant loop", func() {
+		subject = &Line{
+			Role: "outer",
+			// Colorado, USA: nw, ne, se, sw, nw
+			Path: []*osm.Node{
+				{Lat: 41, Lng: -109},
+				{Lat: 41, Lng: -102},
+				{Lat: 37, Lng: -102},
+				{Lat: 37, Lng: -109},
+				{Lat: 41, Lng: -109},
+			},
+		}
+		antiClockwise := &Line{
+			Role: "outer",
+			// Colorado, USA: ne, nw, sw, se, ne
+			Path: []*osm.Node{
+				{Lat: 41, Lng: -102},
+				{Lat: 41, Lng: -109},
+				{Lat: 37, Lng: -109},
+				{Lat: 37, Lng: -102},
+				{Lat: 41, Lng: -102},
+			},
+		}
+
+		Expect(subject.Loop()).To(Equal(antiClockwise.Loop()))
 	})
 
 })
