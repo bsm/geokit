@@ -86,6 +86,8 @@ func (l *Line) Loop() *s2.Loop {
 	if lp.RectBound().Area() >= 2*math.Pi {
 		poly := s2.Polyline(pts)
 		poly.Reverse()
+		// Reinitiate loop for initOriginAndBound()
+		lp = s2.LoopFromPoints(pts)
 	}
 
 	return lp
