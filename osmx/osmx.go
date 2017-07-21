@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/bsm/geokit/geo"
 	osm "github.com/glaslos/go-osm"
 	"github.com/golang/geo/s2"
 )
@@ -106,28 +105,20 @@ func (l *Line) reversePath() []*osm.Node {
 type lineMap map[int64]*Line
 
 // Loops constructs geo.Loop objects from the lineMap.
-func (m lineMap) Loops() ([]geo.Loop, error) {
-	var loop []geo.Loop
+func (m lineMap) Loops() ([]s2.Loop, error) {
+	var res []s2.Loop
 
 	lns, err := m.lines()
 	if err != nil {
 		return nil, err
 	}
 
-	var g geo.Loop
 	for _, ln := range lns {
-		g = geo.Loop{Loop: ln.Loop()}
-
 		if ln.Role == "outer" {
-			g.Kind = geo.LoopKindOuter
-		} else {
-			g.Kind = geo.LoopKindInner
+			res = append(res, *ln.Loop())
 		}
-
-		loop = append(loop, g)
 	}
-
-	return loop, nil
+	return res, nil
 }
 
 func (m lineMap) lines() ([]*Line, error) {
