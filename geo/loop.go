@@ -109,6 +109,16 @@ func LoopIntersectionWithCell(loop *s2.Loop, cell s2.Cell) []s2.Loop {
 	return res
 }
 
+// FitLoops returns an un-normalised CellUnion approximating
+// the surface covered by the loops, with the smallest
+// cell being maxLevel.
+func FitLoops(loops []s2.Loop, acc s2.CellUnion, maxLevel int) s2.CellUnion {
+	for _, l := range loops {
+		acc = FitLoop(&l, acc, maxLevel)
+	}
+	return acc
+}
+
 // FitLoop returns an un-normalised CellUnion approximating
 // the surface covered by the loop, with the smallest
 // cell being maxLevel.
