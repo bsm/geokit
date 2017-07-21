@@ -148,9 +148,9 @@ var _ = DescribeTable("should intersect cells",
 )
 
 var _ = Describe("FitLoop", func() {
+	loop := s2.LoopFromPoints(colorado)
 
 	It("should fit loop", func() {
-		loop := s2.LoopFromPoints(colorado)
 		cu := FitLoop(loop, nil, 7)
 		cu.Normalize()
 
@@ -184,6 +184,21 @@ var _ = Describe("FitLoop", func() {
 			s2.CellIDFromToken("8774c"),
 			s2.CellIDFromToken("8776c"),
 		}))
+	})
+
+	It("should fit loop-iterate", func() {
+		var cellID s2.CellID
+		var overlap LoopOverlap
+		var n int
+
+		FitLoopDo(loop, 7, func(id s2.CellID, s LoopOverlap) bool {
+			n++
+			cellID, overlap = id, s
+			return false
+		})
+		Expect(n).To(Equal(1))
+		Expect(cellID.ToToken()).To(Equal("8708c"))
+		Expect(overlap).To(Equal(LoopOverlap_Partial))
 	})
 
 })
