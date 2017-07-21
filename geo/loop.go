@@ -109,42 +109,38 @@ func LoopIntersectionWithCell(loop *s2.Loop, cell s2.Cell) []s2.Loop {
 	return res
 }
 
-// FitLoops returns an un-normalised CellUnion approximating
-// the surface covered by the loops, with the smallest
-// cell being maxLevel.
-func FitLoops(loops []s2.Loop, acc s2.CellUnion, maxLevel int) s2.CellUnion {
-	for _, l := range loops {
-		acc = FitLoop(&l, acc, maxLevel)
-	}
-	return acc
-}
-
 // FitLoop returns an un-normalised CellUnion approximating
 // the surface covered by the loop, with the smallest
 // cell being maxLevel.
 func FitLoop(loop *s2.Loop, acc s2.CellUnion, maxLevel int) s2.CellUnion {
-	for i := 0; i < 6; i++ {
-		acc = fitLoop(loop, s2.CellIDFromFace(i), acc, maxLevel)
-	}
-
+	FitLoopDo(loop, maxLevel, func(cellID s2.CellID, _ LoopOverlap) {
+		acc = append(acc, cellID)
+	})
 	return acc
 }
 
-func fitLoop(loop *s2.Loop, cellID s2.CellID, acc s2.CellUnion, maxLevel int) s2.CellUnion {
-	cell := s2.CellFromCellID(cellID)
+// FitLoopDo iterates over the cells of a loop and their LoopOverlap, with the smallest
+// cell being maxLevel.
+func FitLoopDo(loop *s2.Loop, maxLevel int, fn func(s2.CellID, LoopOverlap)) {
+	for i := 0; i < 6; i++ {
+		fitLoopDo(loop, s2.CellIDFromFace(i), maxLevel, fn)
+	}
+}
 
-	switch LoopIntersectsWithCell(loop, cell) {
+func fitLoopDo(loop *s2.Loop, cellID s2.CellID, maxLevel int, fn func(s2.CellID, LoopOverlap)) {
+	cell := s2.CellFromCellID(cellID)
+	over := LoopIntersectsWithCell(loop, cell)
+
+	switch over {
 	case LoopOverlap_ContainsCell:
-		acc = append(acc, cellID)
+		fn(cellID, over)
 	case LoopOverlap_Partial, LoopOverlap_ContainedByCell:
 		if cell.Level() == maxLevel {
-			acc = append(acc, cellID)
+			fn(cellID, over)
 		} else {
 			for _, childID := range cellID.Children() {
-				acc = fitLoop(loop, childID, acc, maxLevel)
+				fitLoopDo(loop, childID, maxLevel, fn)
 			}
 		}
 	}
-
-	return acc
 }
