@@ -24,12 +24,12 @@ type TabWriter struct {
 	buf []byte
 }
 
-func CreateTab(fname string) (*TabWriter, error) {
+func AppendTab(fname string) (*TabWriter, error) {
 	if fname == "-" {
 		return &TabWriter{}, nil
 	}
 
-	f, err := os.Create(fname)
+	f, err := os.OpenFile(fname, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, err
 	}

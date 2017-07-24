@@ -26,7 +26,7 @@ var _ = Describe("Tab", func() {
 	})
 
 	var runTest = func(fname string, expSize int64) {
-		w, err := CreateTab(fname)
+		w, err := AppendTab(fname)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(w.Put(c1, []byte("DATA1"))).To(Succeed())
 		Expect(w.Put(c1, []byte("DATA2"))).To(Succeed())
