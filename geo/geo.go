@@ -14,17 +14,17 @@ func binWrite(w io.Writer, v interface{}) error {
 
 // EdgeIntersection returns the intersection point between the edges (a-b)
 // and (c-d).
-func EdgeIntersection(a, b, c, d s2.Point) s2.Point {
-	ab := s2.Point{Vector: a.PointCross(b).Normalize()}
-	cd := s2.Point{Vector: c.PointCross(d).Normalize()}
-	x := s2.Point{Vector: ab.PointCross(cd).Normalize()}
+func EdgeIntersection(a, b s2.Edge) s2.Point {
+	va := s2.Point{Vector: a.V0.PointCross(a.V1).Normalize()}
+	vb := s2.Point{Vector: b.V0.PointCross(b.V1).Normalize()}
+	x := s2.Point{Vector: va.PointCross(vb).Normalize()}
 
 	// Make sure the intersection point is on the correct side of the sphere.
 	// Since all vertices are unit length, and edges are less than 180 degrees,
 	// (a + b) and (c + d) both have positive dot product with the
 	// intersection point.  We use the sum of all vertices to make sure that the
 	// result is unchanged when the edges are reversed or exchanged.
-	if v1, v2 := a.Add(b.Vector), c.Add(d.Vector); x.Dot(v1.Add(v2)) < 0 {
+	if v1, v2 := a.V0.Add(a.V1.Vector), b.V0.Add(b.V1.Vector); x.Dot(v1.Add(v2)) < 0 {
 		x = s2.Point{Vector: r3.Vector{X: -x.X, Y: -x.Y, Z: -x.Z}}
 	}
 
@@ -35,7 +35,7 @@ func EdgeIntersection(a, b, c, d s2.Point) s2.Point {
 	// segments.  In other words, "x" might be on the great circle through
 	// (a,b) but outside the range covered by (a,b).  In this case we do
 	// additional clipping to ensure that it does.
-	if s2.OrderedCCW(a, x, b, ab) && s2.OrderedCCW(c, x, d, cd) {
+	if s2.OrderedCCW(a.V0, x, a.V1, va) && s2.OrderedCCW(b.V0, x, b.V1, vb) {
 		return x
 	}
 
@@ -48,17 +48,17 @@ func EdgeIntersection(a, b, c, d s2.Point) s2.Point {
 			dmin2, vmin = d2, y
 		}
 	}
-	if s2.OrderedCCW(c, a, d, cd) {
-		findMinDist(a)
+	if s2.OrderedCCW(b.V0, a.V0, b.V1, vb) {
+		findMinDist(a.V0)
 	}
-	if s2.OrderedCCW(c, b, d, cd) {
-		findMinDist(b)
+	if s2.OrderedCCW(b.V0, a.V1, b.V1, vb) {
+		findMinDist(a.V1)
 	}
-	if s2.OrderedCCW(a, c, b, ab) {
-		findMinDist(c)
+	if s2.OrderedCCW(a.V0, b.V0, a.V1, va) {
+		findMinDist(b.V0)
 	}
-	if s2.OrderedCCW(a, d, b, ab) {
-		findMinDist(d)
+	if s2.OrderedCCW(a.V0, b.V1, a.V1, va) {
+		findMinDist(b.V1)
 	}
 	return vmin
 }

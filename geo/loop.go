@@ -27,8 +27,8 @@ func LoopIntersectsWithCell(loop *s2.Loop, cell s2.Cell) LoopOverlap {
 	// Check of if any of the edges cross, if they do
 	// we have a partial overlap
 	for i := 0; i < loop.NumEdges(); i++ {
-		a, b := loop.Edge(i)
-		cc := s2.NewChainEdgeCrosser(a, b, cell.Vertex(3))
+		edge := loop.Edge(i)
+		cc := s2.NewChainEdgeCrosser(edge.V0, edge.V1, cell.Vertex(3))
 
 		for k := 0; k < 4; k++ {
 			if cc.EdgeOrVertexChainCrossing(cell.Vertex(k)) {
@@ -69,14 +69,14 @@ func LoopIntersectionWithCell(loop *s2.Loop, cell s2.Cell) []s2.Loop {
 
 	// find intersections between subject and clip
 	// insert them into the loops
-	subj.DoEdges(func(a, b *circularLoop) {
-		crosser := s2.NewEdgeCrosser(a.Point, b.Point)
+	subj.DoEdges(func(a0, a1 *circularLoop) {
+		crosser := s2.NewEdgeCrosser(a0.Point, a1.Point)
 
-		clip.DoEdges(func(c, d *circularLoop) {
-			if crosser.EdgeOrVertexCrossing(c.Point, d.Point) {
-				x := EdgeIntersection(a.Point, b.Point, c.Point, d.Point)
-				a.PushIntersection(x)
-				c.PushIntersection(x)
+		clip.DoEdges(func(b0, b1 *circularLoop) {
+			if crosser.EdgeOrVertexCrossing(b0.Point, b1.Point) {
+				x := EdgeIntersection(s2.Edge{a0.Point, a1.Point}, s2.Edge{b0.Point, b1.Point})
+				a0.PushIntersection(x)
+				b0.PushIntersection(x)
 			}
 		})
 	})
