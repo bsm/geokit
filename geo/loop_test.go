@@ -22,130 +22,134 @@ var _ = DescribeTable("should show overlaps",
 	Entry("87407", s2.CellFromCellID(s2.CellIDFromToken("87407")), LoopOverlap_ContainsCell),
 )
 
-var _ = DescribeTable("should intersect cells",
-	func(cell s2.Cell, exp [][]testLL) {
-		loop := s2.LoopFromPoints(starshape)
-		res := LoopIntersectionWithCell(loop, cell)
-		act := make([][]testLL, len(res))
-		for i, sub := range res {
-			for _, pt := range sub.Vertices() {
-				act[i] = append(act[i], testLLFromLL(s2.LatLngFromPoint(pt)))
-			}
-		}
-		Expect(act).To(Equal(exp))
-	},
+var _ = Describe("LoopIntersectionWithCell", func() {
 
 	// https://codepen.io/bsm/full/yXxoBw
-	Entry("intersection #1", s2.CellFromCellID(s2.CellIDFromToken("487c")), [][]testLL{
-		{
-			{Lat: 55.49025118915599, Lng: -0.5485288450023249},
-			{Lat: 52.8, Lng: -2.5},
-			{Lat: 52.79999999999999, Lng: -2.7999999999999994},
-			{Lat: 55.04570014114161, Lng: -3.5241950002328104},
-			{Lat: 52.65891336258596, Lng: -3.2286478696356156},
-			{Lat: 52.702795575506265, Lng: 0},
-			{Lat: 55.4914770123316, Lng: 0},
+	var _ = DescribeTable("should intersect cells",
+		func(cell s2.Cell, exp [][]testLL) {
+			loop := s2.LoopFromPoints(starshape)
+			res := LoopIntersectionWithCell(loop, cell)
+			act := make([][]testLL, len(res))
+			for i, sub := range res {
+				for _, pt := range sub.Vertices() {
+					act[i] = append(act[i], testLLFromLL(s2.LatLngFromPoint(pt)))
+				}
+			}
+			Expect(act).To(Equal(exp))
 		},
-	}),
-	Entry("intersection #2", s2.CellFromCellID(s2.CellIDFromToken("4864")), [][]testLL{
-		{
-			{Lat: 55.04570014114161, Lng: -3.5241950002328104},
-			{Lat: 55.436881634509696, Lng: -3.658825504677576},
-			{Lat: 55.341645616168115, Lng: -6.055783348836986},
-			{Lat: 54.199999999999996, Lng: -5.9},
-			{Lat: 55.29388594664117, Lng: -6.95112363618213},
-			{Lat: 55.271147659547914, Lng: -7.338606336236236},
-			{Lat: 52.51729571887204, Lng: -6.6302672811716565},
-			{Lat: 52.65891336258596, Lng: -3.2286478696356156},
-		},
-	}),
-	Entry("intersection #3", s2.CellFromCellID(s2.CellIDFromToken("485c")), [][]testLL{
-		{
-			{Lat: 55.098158572302424, Lng: -9.788971248943719},
-			{Lat: 52.404341214621056, Lng: -8.402090576646428},
-			{Lat: 52.51729571887204, Lng: -6.6302672811716565},
-			{Lat: 55.271147659547914, Lng: -7.338606336236236},
-		},
-		{
-			{Lat: 52.40394615622857, Lng: -8.407621812846674},
-			{Lat: 53.51622505381126, Lng: -10.653801181254847},
-			{Lat: 52.26403022762314, Lng: -10.175510843043208},
-		},
-	}),
-	Entry("intersection #4", s2.CellFromCellID(s2.CellIDFromToken("4884")), [][]testLL{
-		{
-			{Lat: 56.1807701901571, Lng: 0},
-			{Lat: 55.49025118915599, Lng: -0.5485288450023249},
-			{Lat: 55.4914770123316, Lng: 0},
-		},
-	}),
-	Entry("intersection #5", s2.CellFromCellID(s2.CellIDFromToken("48f4")), [][]testLL{
-		{
-			{Lat: 55.83463125668, Lng: -7.495865493920974},
-			{Lat: 57.98997729769019, Lng: -9.85664223918145},
-			{Lat: 57.857019075856044, Lng: -11.428907681691742},
-			{Lat: 55.098158572302424, Lng: -9.788971248943719},
-			{Lat: 55.271147659547914, Lng: -7.338606336236236},
-		},
-	}),
-	Entry("intersection #6", s2.CellFromCellID(s2.CellIDFromToken("4894")), [][]testLL{
-		{
-			{Lat: 58.28440827511659, Lng: -4.728322639913982},
-			{Lat: 61.19329709869352, Lng: -6.019464322702787},
-			{Lat: 61.14526185564005, Lng: -7.014779887724787},
-			{Lat: 58.20698177475088, Lng: -6.489892622888502},
-		},
-	}),
-	Entry("intersection #7", s2.CellFromCellID(s2.CellIDFromToken("48ec")), [][]testLL{
-		{
-			{Lat: 57.98997729769019, Lng: -9.85664223918145},
-			{Lat: 60.66551856508017, Lng: -13.30792398352961},
-			{Lat: 60.657175844867204, Lng: -13.39023598510639},
-			{Lat: 57.857019075856044, Lng: -11.428907681691742},
-		},
-	}),
-	Entry("intersection #8", s2.CellFromCellID(s2.CellIDFromToken("488c")), [][]testLL{
-		{
-			{Lat: 55.436881634509696, Lng: -3.658825504677576},
-			{Lat: 58.28440827511659, Lng: -4.728322639913982},
-			{Lat: 58.20698177475088, Lng: -6.489892622888502},
-			{Lat: 55.341645616168115, Lng: -6.055783348836986},
-		},
-		{
-			{Lat: 55.29388594664117, Lng: -6.95112363618213},
-			{Lat: 55.83463125668, Lng: -7.495865493920974},
-			{Lat: 55.271147659547914, Lng: -7.338606336236236},
-		},
-	}),
-	Entry("intersection #9", s2.CellFromCellID(s2.CellIDFromToken("4844")), [][]testLL{
-		{
-			{Lat: 52.404341214621056, Lng: -8.402090576646428},
-			{Lat: 52.39999999999999, Lng: -8.4},
-			{Lat: 52.40394615622857, Lng: -8.407621812846674},
-			{Lat: 52.26403022762314, Lng: -10.175510843043208},
-			{Lat: 49.648301643763276, Lng: -9.260221531171478},
-			{Lat: 49.862303747198254, Lng: -6.027530295521267},
-			{Lat: 52.51729571887204, Lng: -6.6302672811716565},
-		},
-	}),
-	Entry("within #1", s2.CellFromCellID(s2.CellIDFromToken("4868")), [][]testLL{
-		{
-			{Lat: 49.98177401188154, Lng: -2.933398179187317},
-			{Lat: 52.65891336258596, Lng: -3.2286478696356156},
-			{Lat: 52.51729571887204, Lng: -6.6302672811716565},
-			{Lat: 49.862303747198254, Lng: -6.027530295521267},
-		},
-	}),
-	Entry("within #2", s2.CellFromCellID(s2.CellIDFromToken("4874")), [][]testLL{
-		{
-			{Lat: 50.01876534108111, Lng: 0},
-			{Lat: 52.702795575506265, Lng: 0},
-			{Lat: 52.65891336258596, Lng: -3.2286478696356156},
-			{Lat: 49.98177401188154, Lng: -2.933398179187317},
-		},
-	}),
-	Entry("outside #1", s2.CellFromCellID(s2.CellIDFromToken("489c")), [][]testLL{}),
-)
+
+		Entry("intersection #1", s2.CellFromCellID(s2.CellIDFromToken("487c")), [][]testLL{
+			{
+				{Lat: 55.49025118915599, Lng: -0.5485288450023249},
+				{Lat: 52.8, Lng: -2.5},
+				{Lat: 52.79999999999999, Lng: -2.7999999999999994},
+				{Lat: 55.04570014114161, Lng: -3.5241950002328104},
+				{Lat: 52.65891336258596, Lng: -3.2286478696356156},
+				{Lat: 52.702795575506265, Lng: 0},
+				{Lat: 55.4914770123316, Lng: 0},
+			},
+		}),
+		Entry("intersection #2", s2.CellFromCellID(s2.CellIDFromToken("4864")), [][]testLL{
+			{
+				{Lat: 55.04570014114161, Lng: -3.5241950002328104},
+				{Lat: 55.436881634509696, Lng: -3.658825504677576},
+				{Lat: 55.341645616168115, Lng: -6.055783348836986},
+				{Lat: 54.199999999999996, Lng: -5.9},
+				{Lat: 55.29388594664117, Lng: -6.95112363618213},
+				{Lat: 55.271147659547914, Lng: -7.338606336236236},
+				{Lat: 52.51729571887204, Lng: -6.6302672811716565},
+				{Lat: 52.65891336258596, Lng: -3.2286478696356156},
+			},
+		}),
+		Entry("intersection #3", s2.CellFromCellID(s2.CellIDFromToken("485c")), [][]testLL{
+			{
+				{Lat: 55.098158572302424, Lng: -9.788971248943719},
+				{Lat: 52.404341214621056, Lng: -8.402090576646428},
+				{Lat: 52.51729571887204, Lng: -6.6302672811716565},
+				{Lat: 55.271147659547914, Lng: -7.338606336236236},
+			},
+			{
+				{Lat: 52.40394615622857, Lng: -8.407621812846674},
+				{Lat: 53.51622505381126, Lng: -10.653801181254847},
+				{Lat: 52.26403022762314, Lng: -10.175510843043208},
+			},
+		}),
+		Entry("intersection #4", s2.CellFromCellID(s2.CellIDFromToken("4884")), [][]testLL{
+			{
+				{Lat: 56.1807701901571, Lng: 0},
+				{Lat: 55.49025118915599, Lng: -0.5485288450023249},
+				{Lat: 55.4914770123316, Lng: 0},
+			},
+		}),
+		Entry("intersection #5", s2.CellFromCellID(s2.CellIDFromToken("48f4")), [][]testLL{
+			{
+				{Lat: 55.83463125668, Lng: -7.495865493920974},
+				{Lat: 57.98997729769019, Lng: -9.85664223918145},
+				{Lat: 57.857019075856044, Lng: -11.428907681691742},
+				{Lat: 55.098158572302424, Lng: -9.788971248943719},
+				{Lat: 55.271147659547914, Lng: -7.338606336236236},
+			},
+		}),
+		Entry("intersection #6", s2.CellFromCellID(s2.CellIDFromToken("4894")), [][]testLL{
+			{
+				{Lat: 58.28440827511659, Lng: -4.728322639913982},
+				{Lat: 61.19329709869352, Lng: -6.019464322702787},
+				{Lat: 61.14526185564005, Lng: -7.014779887724787},
+				{Lat: 58.20698177475088, Lng: -6.489892622888502},
+			},
+		}),
+		Entry("intersection #7", s2.CellFromCellID(s2.CellIDFromToken("48ec")), [][]testLL{
+			{
+				{Lat: 57.98997729769019, Lng: -9.85664223918145},
+				{Lat: 60.66551856508017, Lng: -13.30792398352961},
+				{Lat: 60.657175844867204, Lng: -13.39023598510639},
+				{Lat: 57.857019075856044, Lng: -11.428907681691742},
+			},
+		}),
+		Entry("intersection #8", s2.CellFromCellID(s2.CellIDFromToken("488c")), [][]testLL{
+			{
+				{Lat: 55.436881634509696, Lng: -3.658825504677576},
+				{Lat: 58.28440827511659, Lng: -4.728322639913982},
+				{Lat: 58.20698177475088, Lng: -6.489892622888502},
+				{Lat: 55.341645616168115, Lng: -6.055783348836986},
+			},
+			{
+				{Lat: 55.29388594664117, Lng: -6.95112363618213},
+				{Lat: 55.83463125668, Lng: -7.495865493920974},
+				{Lat: 55.271147659547914, Lng: -7.338606336236236},
+			},
+		}),
+		Entry("intersection #9", s2.CellFromCellID(s2.CellIDFromToken("4844")), [][]testLL{
+			{
+				{Lat: 52.404341214621056, Lng: -8.402090576646428},
+				{Lat: 52.39999999999999, Lng: -8.4},
+				{Lat: 52.40394615622857, Lng: -8.407621812846674},
+				{Lat: 52.26403022762314, Lng: -10.175510843043208},
+				{Lat: 49.648301643763276, Lng: -9.260221531171478},
+				{Lat: 49.862303747198254, Lng: -6.027530295521267},
+				{Lat: 52.51729571887204, Lng: -6.6302672811716565},
+			},
+		}),
+		Entry("within #1", s2.CellFromCellID(s2.CellIDFromToken("4868")), [][]testLL{
+			{
+				{Lat: 49.98177401188154, Lng: -2.933398179187317},
+				{Lat: 52.65891336258596, Lng: -3.2286478696356156},
+				{Lat: 52.51729571887204, Lng: -6.6302672811716565},
+				{Lat: 49.862303747198254, Lng: -6.027530295521267},
+			},
+		}),
+		Entry("within #2", s2.CellFromCellID(s2.CellIDFromToken("4874")), [][]testLL{
+			{
+				{Lat: 50.01876534108111, Lng: 0},
+				{Lat: 52.702795575506265, Lng: 0},
+				{Lat: 52.65891336258596, Lng: -3.2286478696356156},
+				{Lat: 49.98177401188154, Lng: -2.933398179187317},
+			},
+		}),
+		Entry("outside #1", s2.CellFromCellID(s2.CellIDFromToken("489c")), [][]testLL{}),
+	)
+
+})
 
 var _ = Describe("FitLoop", func() {
 	loop := s2.LoopFromPoints(colorado)
