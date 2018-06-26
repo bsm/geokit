@@ -3,6 +3,7 @@ package osmx
 import (
 	"errors"
 	"fmt"
+	"io"
 	"sort"
 
 	osm "github.com/glaslos/go-osm"
@@ -13,6 +14,15 @@ import (
 type Map struct {
 	*osm.Map
 	rel osm.Relation
+}
+
+// Decode decodes a Map.
+func Decode(r io.Reader) (*Map, error) {
+	parent, err := osm.Decode(r)
+	if err != nil {
+		return nil, err
+	}
+	return WrapMap(parent)
 }
 
 // WrapMap initialises Map and sorts indexes
