@@ -41,20 +41,10 @@ func WrapMap(parent *osm.Map) (*Map, error) {
 	return m, nil
 }
 
-// CountryAlpha2 returns the ISO3166-1 alpha2 code of the Map
-func (m *Map) CountryAlpha2() string {
+// Tag returns the value if a particular tag.
+func (m *Map) Tag(key string) string {
 	for _, tag := range m.rel.Tags {
-		if tag.Key == "ISO3166-1:alpha2" {
-			return tag.Value
-		}
-	}
-	return ""
-}
-
-// CountryAlpha3 returns the ISO3166-1 alpha3 code of the Map
-func (m *Map) CountryAlpha3() string {
-	for _, tag := range m.rel.Tags {
-		if tag.Key == "ISO3166-1:alpha3" {
+		if tag.Key == key {
 			return tag.Value
 		}
 	}

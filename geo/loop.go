@@ -74,7 +74,7 @@ func LoopIntersectionWithCell(loop *s2.Loop, cell s2.Cell) []s2.Loop {
 
 		clip.DoEdges(func(b0, b1 *circularLoop) {
 			if crosser.EdgeOrVertexCrossing(b0.Point, b1.Point) {
-				x := EdgeIntersection(s2.Edge{a0.Point, a1.Point}, s2.Edge{b0.Point, b1.Point})
+				x := EdgeIntersection(s2.Edge{V0: a0.Point, V1: a1.Point}, s2.Edge{V0: b0.Point, V1: b1.Point})
 				a0.PushIntersection(x)
 				b0.PushIntersection(x)
 			}

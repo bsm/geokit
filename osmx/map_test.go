@@ -39,7 +39,7 @@ var _ = Describe("Map", func() {
 		}))
 	})
 
-	It("should retrieve alpha2", func() {
+	It("should retrieve tag", func() {
 		subject = &Map{
 			rel: osm.Relation{
 				Tags: []osm.Tag{
@@ -47,17 +47,8 @@ var _ = Describe("Map", func() {
 				},
 			},
 		}
-		Expect(subject.CountryAlpha2()).To(Equal("GB"))
+		Expect(subject.Tag("ISO3166-1:alpha2")).To(Equal("GB"))
+		Expect(subject.Tag("notfound")).To(Equal(""))
 	})
 
-	It("should retrieve alpha3", func() {
-		subject = &Map{
-			rel: osm.Relation{
-				Tags: []osm.Tag{
-					{Key: "ISO3166-1:alpha3", Value: "GBR"},
-				},
-			},
-		}
-		Expect(subject.CountryAlpha3()).To(Equal("GBR"))
-	})
 })
