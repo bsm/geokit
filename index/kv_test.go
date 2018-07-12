@@ -1,40 +1,35 @@
 package index
 
 import (
-	"io/ioutil"
-	"os"
-
 	"github.com/golang/geo/s2"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("SST", func() {
-	var subject *SSTReader
-	var dir string
-
+var _ = Describe("Reader/Writer", func() {
+	var subject *Reader
+	var store *InMemStore
 	var cellID = s2.CellIDFromToken("aaaabbbb")
 
 	BeforeEach(func() {
-		var err error
-		dir, err = ioutil.TempDir("", "geo-index-sst-test")
-		Expect(err).NotTo(HaveOccurred())
+		store = NewInMemStore()
 
-		w, err := CreateSST(dir + "/data.sst")
-		Expect(err).NotTo(HaveOccurred())
+		w := NewWriter(store)
 		Expect(w.Put(cellID, []byte("DATA"))).To(Succeed())
-		Expect(w.Close()).To(Succeed())
 
-		subject, err = OpenSST(dir + "/data.sst")
-		Expect(err).NotTo(HaveOccurred())
+		subject = NewReader(store)
 	})
 
 	AfterEach(func() {
-		Expect(subject.Close()).To(Succeed())
-		Expect(os.RemoveAll(dir)).To(Succeed())
+		Expect(store.Close()).To(Succeed())
 	})
 
-	It("should succeed in querying for the correct value", func() {
+	It("should write", func() {
+		Expect(store.Len()).To(Equal(1))
+		Expect(store.Get([]byte{0xaa, 0xaa, 0xbb, 0xbb, 0x00, 0x00, 0x00, 0x00})).To(Equal([]byte("DATA")))
+	})
+
+	It("should query", func() {
 		val, err := subject.Get(cellID)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(val).To(Equal([]byte("DATA")))
