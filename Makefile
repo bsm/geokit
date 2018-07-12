@@ -6,6 +6,9 @@ vet:
 test:
 	go test ./...
 
+bench:
+	go test ./... -run=NONE -bench=. -benchmem
+
 deps:
 	dep ensure -v
 
