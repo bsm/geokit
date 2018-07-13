@@ -46,8 +46,8 @@ var _ = Describe("Writer", func() {
 			Expect(subject.Append(cellID+s2.CellID(i), value)).To(Succeed())
 		}
 		Expect(subject.Close()).To(Succeed())
-		Expect(len(subject.index)).To(Equal(820))
-		Expect(buf.Len()).To(BeNumerically("~", 819259, 1000))
+		Expect(len(subject.index)).To(Equal(1667))
+		Expect(buf.Len()).To(BeNumerically("~", 838709, 1000))
 		Expect(buf.Bytes()[buf.Len()-8:]).To(Equal(magic))
 	})
 
