@@ -10,6 +10,8 @@ import (
 	"github.com/golang/snappy"
 )
 
+const earthRadius = 6378100.0 // in meters
+
 // Reader represents a cellstore reader
 type Reader struct {
 	r io.ReaderAt
@@ -145,6 +147,84 @@ func (r *Reader) readBlock(blockNo int) (*Iterator, error) {
 		blockBuf:   buf[:eoi],
 		entryPos:   -1,
 	}, nil
+}
+
+type Near struct {
+	CellID   s2.CellID
+	Value    []byte
+	Distance int32
+}
+
+type Nearby []*Near
+type ByDistance []*Near
+
+func (n ByDistance) Len() int           { return len(n) }
+func (n ByDistance) Swap(i, j int)      { n[i], n[j] = n[j], n[i] }
+func (n ByDistance) Less(i, j int) bool { return n[i].Distance < n[j].Distance }
+
+// FindNearby
+func (r *Reader) FindNearby(loc s2.CellID, limit int) (Nearby, error) {
+
+	var dst Nearby
+
+	// find the block
+	it, err := r.FindBlock(loc)
+	if err != nil {
+		return dst, err
+	}
+
+	// iterate of the matching block
+	before := 0
+	after := 0
+	for it.Next() {
+		if it.CellID() < loc {
+			before += 1
+		} else {
+			after += 1
+		}
+
+		dist := int32(earthRadius * it.CellID().LatLng().Distance(loc.LatLng()).Radians())
+		dst = append(dst, &Near{CellID: it.CellID(), Value: it.Value(), Distance: dist})
+
+		// break if we have enough records after the pivot
+		if after >= limit {
+			break
+		}
+	}
+
+	// prepend previous blocks values if required
+	if before < limit && it.PrevBlock() {
+		var res Nearby
+		for it.Next() {
+			res = append(res, &Near{CellID: it.CellID(), Value: it.Value()})
+		}
+		res = res[len(res)-(limit-before):]
+		dst = append(res, dst...)
+	}
+
+	// append next blocks values if required
+	if after < limit && it.NextBlock() {
+		for it.Next() {
+			after += 1
+
+			dist := int32(earthRadius * it.CellID().LatLng().Distance(loc.LatLng()).Radians())
+			dst = append(dst, &Near{CellID: it.CellID(), Value: it.Value(), Distance: dist})
+
+			// break if we have enough records after the pivot
+			if after >= limit {
+				break
+			}
+		}
+	}
+
+	// sort the results
+	sort.Sort(ByDistance(dst))
+
+	if len(dst) < limit {
+		return dst, nil
+	}
+
+	return dst[:limit], nil
 }
 
 // --------------------------------------------------------------------

@@ -188,4 +188,10 @@ var _ = Describe("Reader", func() {
 		Expect(it2.NextBlock()).To(BeFalse())
 	})
 
+	It("should find nearby", func() {
+		res, err := subject.FindNearby(s2.CellID(1317624576600000249), 4)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(res).To(HaveLen(4))
+	})
+
 })
