@@ -2,6 +2,7 @@ package cellstore
 
 import (
 	"bytes"
+	"math/rand"
 
 	"github.com/golang/geo/s2"
 	. "github.com/onsi/ginkgo"
@@ -42,12 +43,17 @@ var _ = Describe("Writer", func() {
 	})
 
 	It("should write", func() {
+		rnd := rand.New(rand.NewSource(1))
+		val := make([]byte, 128)
+
 		for i := 0; i < 100000; i += 2 {
-			Expect(subject.Append(cellID+s2.CellID(i), value)).To(Succeed())
+			_, err := rnd.Read(val)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(subject.Append(cellID+s2.CellID(i), val)).To(Succeed())
 		}
 		Expect(subject.Close()).To(Succeed())
-		Expect(len(subject.index)).To(Equal(1667))
-		Expect(buf.Len()).To(BeNumerically("~", 838709, 1000))
+		Expect(len(subject.index)).To(Equal(807))
+		Expect(buf.Len()).To(BeNumerically("~", 6562946, 1000))
 		Expect(buf.Bytes()[buf.Len()-8:]).To(Equal(magic))
 	})
 

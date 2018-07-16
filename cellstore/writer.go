@@ -34,7 +34,7 @@ func NewWriter(w io.Writer, o *Options) *Writer {
 	return &Writer{
 		w:   w,
 		o:   opts,
-		tmp: make([]byte, 8+binary.MaxVarintLen64),
+		tmp: make([]byte, 2*binary.MaxVarintLen64),
 	}
 }
 
@@ -49,14 +49,18 @@ func (w *Writer) Append(cellID s2.CellID, data []byte) error {
 		return fmt.Errorf("cellstore: attempted an out-of-order append, %v must be > %v", cellID, w.last)
 	}
 
-	binary.BigEndian.PutUint64(w.tmp, uint64(cellID))
-	n := binary.PutUvarint(w.tmp[8:], uint64(len(data))) + 8
-
-	if len(w.buf)+len(data)+n > w.o.BlockSize {
+	if len(w.buf) != 0 && len(w.buf)+len(data)+2*binary.MaxVarintLen64 > w.o.BlockSize {
 		if err := w.flush(); err != nil {
 			return err
 		}
 	}
+
+	key := cellID
+	if len(w.buf) != 0 { // delta-encode CellID
+		key -= w.last
+	}
+	n := binary.PutUvarint(w.tmp[0:], uint64(key))
+	n += binary.PutUvarint(w.tmp[n:], uint64(len(data)))
 
 	w.buf = append(w.buf, w.tmp[:n]...)
 	w.buf = append(w.buf, data...)
@@ -91,9 +95,17 @@ func (w *Writer) Close() error {
 }
 
 func (w *Writer) writeIndex() error {
-	for _, ent := range w.index {
-		binary.BigEndian.PutUint64(w.tmp[0:], uint64(ent.MaxCellID))
-		n := binary.PutUvarint(w.tmp[8:], uint64(ent.Offset)) + 8
+	var last blockInfo
+	for i, ent := range w.index {
+		cid, off := ent.MaxCellID, ent.Offset
+		if i > 0 { // delta-encode
+			cid -= last.MaxCellID
+			off -= last.Offset
+		}
+		last = ent
+
+		n := binary.PutUvarint(w.tmp[0:], uint64(cid))
+		n += binary.PutUvarint(w.tmp[n:], uint64(off))
 		if err := w.writeRaw(w.tmp[:n], NoCompression); err != nil {
 			return err
 		}
@@ -111,8 +123,8 @@ func (w *Writer) writeFlags() error {
 }
 
 func (w *Writer) writeFooter(indexOffset, flagsOffset int64) error {
-	binary.BigEndian.PutUint64(w.tmp[0:], uint64(indexOffset))
-	binary.BigEndian.PutUint64(w.tmp[8:], uint64(flagsOffset))
+	binary.LittleEndian.PutUint64(w.tmp[0:], uint64(indexOffset))
+	binary.LittleEndian.PutUint64(w.tmp[8:], uint64(flagsOffset))
 	if err := w.writeRaw(w.tmp[:16], NoCompression); err != nil {
 		return err
 	}

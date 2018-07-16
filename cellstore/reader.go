@@ -36,8 +36,8 @@ func NewReader(r io.ReaderAt, size int64) (*Reader, error) {
 	if !bytes.Equal(tmp[16:24], magic) {
 		return nil, errBadMagic
 	}
-	flagsOffset := int64(binary.BigEndian.Uint64(tmp[8:]))
-	indexOffset := int64(binary.BigEndian.Uint64(tmp[0:]))
+	flagsOffset := int64(binary.LittleEndian.Uint64(tmp[8:]))
+	indexOffset := int64(binary.LittleEndian.Uint64(tmp[0:]))
 
 	// read flags
 	var flags []byte
@@ -75,8 +75,10 @@ func NewReader(r io.ReaderAt, size int64) (*Reader, error) {
 
 	// read index
 	var index []blockInfo
+	var info blockInfo
+
 	for pos := indexOffset; pos < flagsOffset; {
-		tmp = tmp[:8+binary.MaxVarintLen64]
+		tmp = tmp[:2*binary.MaxVarintLen64]
 		if x := flagsOffset - pos; x < int64(len(tmp)) {
 			tmp = tmp[:int(x)]
 		}
@@ -86,16 +88,15 @@ func NewReader(r io.ReaderAt, size int64) (*Reader, error) {
 			return nil, err
 		}
 
-		cellID := binary.BigEndian.Uint64(tmp)
-		pos += 8
-
-		offset, n := binary.Uvarint(tmp[8:])
+		u1, n := binary.Uvarint(tmp[0:])
 		pos += int64(n)
 
-		index = append(index, blockInfo{
-			MaxCellID: s2.CellID(cellID),
-			Offset:    int64(offset),
-		})
+		u2, n := binary.Uvarint(tmp[n:])
+		pos += int64(n)
+
+		info.MaxCellID += s2.CellID(u1)
+		info.Offset += int64(u2)
+		index = append(index, info)
 	}
 
 	return &Reader{
@@ -133,7 +134,9 @@ func (r *Reader) FindBlock(cellID s2.CellID) (*Iterator, error) {
 		return r.index[i].MaxCellID >= cellID
 	})
 	if pos >= len(r.index) {
-		pos = len(r.index) - 1
+		return &Iterator{
+			parent: r,
+		}, nil
 	}
 
 	return r.readBlock(pos)
@@ -213,24 +216,24 @@ func (i *Iterator) First() {
 
 // Next advances the cursor to the next entry
 func (i *Iterator) Next() bool {
-	if i.cur+8 > len(i.buf) {
+	if i.cur+1 > len(i.buf) {
 		return false
 	}
-
-	i.cellID = s2.CellID(binary.BigEndian.Uint64(i.buf[i.cur:]))
-	i.cur += 8
+	key, n := binary.Uvarint(i.buf[i.cur:])
+	i.cellID += s2.CellID(key)
+	i.cur += n
 
 	if i.cur+1 > len(i.buf) {
 		return false
 	}
-	u, n := binary.Uvarint(i.buf[i.cur:])
+	vln, n := binary.Uvarint(i.buf[i.cur:])
 	i.cur += n
 
-	if i.cur+int(u) > len(i.buf) {
+	if i.cur+int(vln) > len(i.buf) {
 		return false
 	}
-	i.value = i.buf[i.cur : i.cur+int(u)]
-	i.cur += int(u)
+	i.value = i.buf[i.cur : i.cur+int(vln)]
+	i.cur += int(vln)
 
 	return true
 }
