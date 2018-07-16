@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"sort"
-	"sync"
 
 	"github.com/golang/geo/s2"
 	"github.com/golang/snappy"
@@ -19,7 +18,6 @@ type Reader struct {
 	index       []blockInfo
 	indexOffset int64
 	compression Compression
-	bufPool     sync.Pool
 }
 
 // NewReader opens a reader.
@@ -126,73 +124,56 @@ func (r *Reader) FindBlock(cellID s2.CellID) (*Iterator, error) {
 		return nil, errInvalidCellID
 	}
 
+	iter := &Iterator{parent: r}
 	if len(r.index) == 0 {
-		return &Iterator{}, nil
+		return iter, nil
 	}
 
-	pos := sort.Search(len(r.index), func(i int) bool {
+	iter.pos = sort.Search(len(r.index), func(i int) bool {
 		return r.index[i].MaxCellID >= cellID
 	})
-	if pos >= len(r.index) {
-		return &Iterator{
-			parent: r,
-		}, nil
+	if iter.pos >= len(r.index) {
+		return iter, nil
 	}
 
-	return r.readBlock(pos)
+	var err error
+	if iter.buf, err = r.readBlock(iter.pos); err != nil {
+		return nil, err
+	}
+	return iter, nil
 }
 
-func (r *Reader) fetchBuffer(sz int) []byte {
-	if v := r.bufPool.Get(); v != nil {
-		if p := v.([]byte); sz <= cap(p) {
-			return p[:sz]
-		}
-	}
-	return make([]byte, sz)
-}
-
-func (r *Reader) readBlock(pos int) (*Iterator, error) {
-	if pos < 0 || pos >= len(r.index) {
-		return nil, ErrBlockUnavailable
-	}
-
+func (r *Reader) readBlock(pos int) ([]byte, error) {
 	min := r.index[pos].Offset
 	max := r.indexOffset
 	if next := pos + 1; next < len(r.index) {
 		max = r.index[next].Offset
 	}
 
-	raw := r.fetchBuffer(int(max - min))
+	raw := fetchBuffer(int(max - min))
 	if _, err := r.r.ReadAt(raw, min); err != nil {
-		r.bufPool.Put(raw)
+		releaseBuffer(raw)
 		return nil, err
 	}
 
-	var buf []byte
-	if r.compression == SnappyCompression {
+	switch r.compression {
+	case SnappyCompression:
+		defer releaseBuffer(raw)
+
 		sz, err := snappy.DecodedLen(raw)
 		if err != nil {
-			r.bufPool.Put(raw)
 			return nil, err
 		}
 
-		tmp := r.fetchBuffer(sz)
-		if buf, err = snappy.Decode(tmp, raw); err != nil {
-			r.bufPool.Put(raw)
-			r.bufPool.Put(tmp)
+		buf, err := snappy.Decode(fetchBuffer(sz), raw)
+		if err != nil {
+			releaseBuffer(buf)
 			return nil, err
 		}
-		r.bufPool.Put(raw)
-	} else {
-		buf = raw
+		return buf, nil
+	default:
+		return raw, nil
 	}
-
-	return &Iterator{
-		parent: r,
-		buf:    buf,
-		pos:    pos,
-	}, nil
-
 }
 
 // --------------------------------------------------------------------
@@ -204,73 +185,86 @@ type Iterator struct {
 	buf []byte
 	cur int // cursor position
 
-	err    error
-	cellID s2.CellID
-	value  []byte
-}
-
-// First positions the cursor at the first entry
-func (i *Iterator) First() {
-	i.cur = 0
+	err error
+	cid s2.CellID
+	val []byte
 }
 
 // Next advances the cursor to the next entry
 func (i *Iterator) Next() bool {
+	if i.err != nil {
+		return false
+	}
+
+	// read CellID
 	if i.cur+1 > len(i.buf) {
 		return false
 	}
 	key, n := binary.Uvarint(i.buf[i.cur:])
-	i.cellID += s2.CellID(key)
+	i.cid += s2.CellID(key)
 	i.cur += n
 
+	// read value length
 	if i.cur+1 > len(i.buf) {
 		return false
 	}
 	vln, n := binary.Uvarint(i.buf[i.cur:])
 	i.cur += n
 
+	// read value
 	if i.cur+int(vln) > len(i.buf) {
 		return false
 	}
-	i.value = i.buf[i.cur : i.cur+int(vln)]
+	i.val = i.buf[i.cur : i.cur+int(vln)]
 	i.cur += int(vln)
 
 	return true
 }
 
-// NextBlock jumps to the next block, may return ErrBlockUnavailable if the
-// block is unavailable.
-func (i *Iterator) NextBlock() error {
-	return i.replaceWith(i.pos + 1)
+// NextBlock jumps to the next block, returns true if successful.
+func (i *Iterator) NextBlock() bool {
+	return i.advance(i.pos + 1)
 }
 
-// PrevBlock jumps to the previous block, may return ErrBlockUnavailable if
-// the block is unavailable.
-func (i *Iterator) PrevBlock() error {
-	return i.replaceWith(i.pos - 1)
+// PrevBlock jumps to the previous block, returns true if successful.
+func (i *Iterator) PrevBlock() bool {
+	return i.advance(i.pos - 1)
 }
 
-func (i *Iterator) replaceWith(pos int) error {
-	b, err := i.parent.readBlock(pos)
-	if err != nil {
-		return err
+func (i *Iterator) advance(pos int) bool {
+	if i.err != nil {
+		return false
 	}
 
-	i.Release()
-	*i = *b
-	return nil
+	if pos < 0 || pos >= len(i.parent.index) {
+		return false
+	}
+
+	buf, err := i.parent.readBlock(pos)
+	if err != nil {
+		i.err = err
+		return false
+	}
+
+	releaseBuffer(i.buf)
+	*i = Iterator{
+		parent: i.parent,
+		pos:    pos,
+		buf:    buf,
+	}
+	return true
 }
 
 // CellID returns the cell ID of the current entry.
 func (i *Iterator) CellID() s2.CellID {
-	return i.cellID
+	return i.cid
 }
 
 // Value returns the value of the current entry. Please note that values
 // are temporary buffers and must be copied if used beyond the next Next() or
 // Release() function call.
 func (i *Iterator) Value() []byte {
-	return i.value
+	return i.val
 }
 
 // Err returns iterator errors
@@ -280,7 +274,5 @@ func (i *Iterator) Err() error {
 
 // Release releases the iterator. It must not be used once this method is called.
 func (i *Iterator) Release() {
-	if cap(i.buf) > 0 {
-		i.parent.bufPool.Put(i.buf)
-	}
+	releaseBuffer(i.buf)
 }

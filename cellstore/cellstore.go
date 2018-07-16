@@ -2,6 +2,7 @@ package cellstore
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/golang/geo/s2"
 )
@@ -19,7 +20,6 @@ var (
 	errBadFlags           = errors.New("cellstore: bad flags section")
 	errInvalidCompression = errors.New("cellstore: invalid compression setting")
 	errInvalidCellID      = errors.New("cellstore: invalid cell ID")
-	ErrBlockUnavailable   = errors.New("cellstore: block unavailable")
 )
 
 const (
@@ -63,4 +63,23 @@ func (o *Options) norm() {
 type blockInfo struct {
 	MaxCellID s2.CellID // maximum cell ID in the block
 	Offset    int64     // block offset position
+}
+
+// --------------------------------------------------------------------
+
+var bufPool sync.Pool
+
+func fetchBuffer(sz int) []byte {
+	if v := bufPool.Get(); v != nil {
+		if p := v.([]byte); sz <= cap(p) {
+			return p[:sz]
+		}
+	}
+	return make([]byte, sz)
+}
+
+func releaseBuffer(p []byte) {
+	if len(p) != 0 {
+		bufPool.Put(p)
+	}
 }

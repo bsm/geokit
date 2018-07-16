@@ -140,11 +140,11 @@ var _ = Describe("Reader", func() {
 		Expect(it.Next()).To(BeTrue())
 		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000241)))
 
-		Expect(it.NextBlock()).To(Succeed())
+		Expect(it.NextBlock()).To(BeTrue())
 		Expect(it.Next()).To(BeTrue())
 		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000361)))
 
-		Expect(it.PrevBlock()).To(Succeed())
+		Expect(it.PrevBlock()).To(BeTrue())
 		Expect(it.Next()).To(BeTrue())
 		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000241)))
 	})
@@ -156,7 +156,7 @@ var _ = Describe("Reader", func() {
 
 		Expect(it1.Next()).To(BeTrue())
 		Expect(it1.CellID()).To(Equal(s2.CellID(1317624576600000001)))
-		Expect(it1.PrevBlock()).To(MatchError(ErrBlockUnavailable))
+		Expect(it1.PrevBlock()).To(BeFalse())
 
 		it2, err := subject.FindBlock(1317624576600000751)
 		Expect(err).NotTo(HaveOccurred())
@@ -164,7 +164,7 @@ var _ = Describe("Reader", func() {
 
 		Expect(it2.Next()).To(BeTrue())
 		Expect(it2.CellID()).To(Equal(s2.CellID(1317624576600000721)))
-		Expect(it2.NextBlock()).To(MatchError(ErrBlockUnavailable))
+		Expect(it2.NextBlock()).To(BeFalse())
 	})
 
 })
