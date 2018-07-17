@@ -199,7 +199,11 @@ func (r *Reader) FindNearby(loc s2.CellID, limit int) (nearby, error) {
 			dist := float64(s2.CellFromCellID(it.CellID()).DistanceToCell(s2.CellFromCellID(loc)))
 			res = append(res, near{CellID: it.CellID(), Value: it.Value(), Distance: dist})
 		}
-		res = res[len(res)-(limit-before):]
+		pos := 0
+		if i := len(res) - (limit - before); i > 0 {
+			pos = i
+		}
+		res = res[pos:]
 		dst = append(res, dst...)
 	}
 
