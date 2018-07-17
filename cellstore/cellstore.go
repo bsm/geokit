@@ -23,8 +23,8 @@ var (
 )
 
 const (
-	flagUnknown byte = iota
-	flagCompression
+	blockNoCompression     = 0
+	blockSnappyCompression = 1
 )
 
 // --------------------------------------------------------------------

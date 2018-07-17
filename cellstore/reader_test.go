@@ -13,8 +13,8 @@ import (
 var _ = Describe("Reader", func() {
 	var buf *bytes.Buffer
 	var subject *Reader
-
 	var cellID = s2.CellID(1317624576600000001)
+
 	var setup = func(n int) {
 		buf = new(bytes.Buffer)
 		rnd := rand.New(rand.NewSource(1))
@@ -68,20 +68,18 @@ var _ = Describe("Reader", func() {
 		return []s2.CellID{min, max}, nil
 	}
 
-	BeforeEach(func() {
-		setup(100)
-	})
+	BeforeEach(func() { setup(100) })
 
 	It("should init", func() {
 		Expect(subject.NumBlocks()).To(Equal(7))
 		Expect(subject.index).To(Equal([]blockInfo{
 			{MaxCellID: 1317624576600000113, Offset: 0},
-			{MaxCellID: 1317624576600000233, Offset: 1978},
-			{MaxCellID: 1317624576600000353, Offset: 3956},
-			{MaxCellID: 1317624576600000473, Offset: 5934},
-			{MaxCellID: 1317624576600000593, Offset: 7912},
-			{MaxCellID: 1317624576600000713, Offset: 9890},
-			{MaxCellID: 1317624576600000793, Offset: 11868},
+			{MaxCellID: 1317624576600000233, Offset: 1974},
+			{MaxCellID: 1317624576600000353, Offset: 3948},
+			{MaxCellID: 1317624576600000473, Offset: 5922},
+			{MaxCellID: 1317624576600000593, Offset: 7896},
+			{MaxCellID: 1317624576600000713, Offset: 9870},
+			{MaxCellID: 1317624576600000793, Offset: 11844},
 		}))
 
 		setup(1000)

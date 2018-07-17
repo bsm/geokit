@@ -82,12 +82,7 @@ func (w *Writer) Close() error {
 		return err
 	}
 
-	flagsOffset := w.offset
-	if err := w.writeFlags(); err != nil {
-		return err
-	}
-
-	if err := w.writeFooter(indexOffset, flagsOffset); err != nil {
+	if err := w.writeFooter(indexOffset); err != nil {
 		return err
 	}
 	w.tmp = nil
@@ -106,40 +101,25 @@ func (w *Writer) writeIndex() error {
 
 		n := binary.PutUvarint(w.tmp[0:], uint64(cid))
 		n += binary.PutUvarint(w.tmp[n:], uint64(off))
-		if err := w.writeRaw(w.tmp[:n], NoCompression); err != nil {
+		if err := w.writeRaw(w.tmp[:n]); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (w *Writer) writeFlags() error {
-	w.tmp[0] = flagCompression
-	w.tmp[1] = byte(w.o.Compression)
-	if err := w.writeRaw(w.tmp[:2], NoCompression); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (w *Writer) writeFooter(indexOffset, flagsOffset int64) error {
+func (w *Writer) writeFooter(indexOffset int64) error {
 	binary.LittleEndian.PutUint64(w.tmp[0:], uint64(indexOffset))
-	binary.LittleEndian.PutUint64(w.tmp[8:], uint64(flagsOffset))
-	if err := w.writeRaw(w.tmp[:16], NoCompression); err != nil {
+	if err := w.writeRaw(w.tmp[:8]); err != nil {
 		return err
 	}
-	if err := w.writeRaw(magic, NoCompression); err != nil {
+	if err := w.writeRaw(magic); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (w *Writer) writeRaw(p []byte, c Compression) error {
-	if c == SnappyCompression {
-		p = snappy.Encode(w.snp[:cap(w.snp)], p)
-		w.snp = p
-	}
-
+func (w *Writer) writeRaw(p []byte) error {
 	n, err := w.w.Write(p)
 	w.offset += int64(n)
 	return err
@@ -155,7 +135,19 @@ func (w *Writer) flush() error {
 		Offset:    w.offset,
 	})
 
-	err := w.writeRaw(w.buf, w.o.Compression)
+	var block []byte
+	switch w.o.Compression {
+	case SnappyCompression:
+		w.snp = snappy.Encode(w.snp[:cap(w.snp)], w.buf)
+		if len(w.snp) < len(w.buf)-len(w.buf)/8 {
+			block = append(w.snp, blockSnappyCompression)
+		} else {
+			block = append(w.buf, blockNoCompression)
+		}
+	default:
+		block = append(w.buf, blockNoCompression)
+	}
+
 	w.buf = w.buf[:0]
-	return err
+	return w.writeRaw(block)
 }
