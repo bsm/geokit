@@ -17,7 +17,7 @@ func TestSuite(t *testing.T) {
 
 func BenchmarkReader(b *testing.B) {
 	const minID = s2.CellID(1317624576693539401)
-	var value = []byte("testdatatestdata")
+	var value = []byte("testdatatestdatatestdata")
 
 	runBench := func(b *testing.B, numRecords int, compression Compression) {
 		f, err := ioutil.TempFile("", "cellstore-bench")
@@ -65,8 +65,10 @@ func BenchmarkReader(b *testing.B) {
 			if err != nil {
 				b.Fatalf("error finding cell %d: %v", cellID, err)
 			}
-			if !it.Next() {
-				b.Fatalf("expected to be able to advance to next entry")
+			for it.Next() {
+			}
+			if err := it.Err(); err != nil {
+				b.Fatalf("error iterating over block containing cell %d: %v", cellID, err)
 			}
 			it.Release()
 		}

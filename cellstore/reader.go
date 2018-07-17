@@ -3,7 +3,6 @@ package cellstore
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"sort"
 
@@ -17,7 +16,6 @@ type Reader struct {
 
 	index       []blockInfo
 	indexOffset int64
-	compression Compression
 }
 
 // NewReader opens a reader.
@@ -25,59 +23,24 @@ func NewReader(r io.ReaderAt, size int64) (*Reader, error) {
 	tmp := make([]byte, 16+binary.MaxVarintLen64)
 
 	// read footer
-	footerOffset := size - 24
-	if _, err := r.ReadAt(tmp[:24], footerOffset); err != nil {
+	footerOffset := size - 16
+	if _, err := r.ReadAt(tmp[:16], footerOffset); err != nil {
 		return nil, err
 	}
 
 	// parse footer
-	if !bytes.Equal(tmp[16:24], magic) {
+	if !bytes.Equal(tmp[8:16], magic) {
 		return nil, errBadMagic
 	}
-	flagsOffset := int64(binary.LittleEndian.Uint64(tmp[8:]))
-	indexOffset := int64(binary.LittleEndian.Uint64(tmp[0:]))
-
-	// read flags
-	var flags []byte
-	if n := int(footerOffset - flagsOffset); n <= cap(tmp) {
-		flags = tmp[:n]
-	} else {
-		flags = make([]byte, n)
-	}
-	if _, err := r.ReadAt(flags, flagsOffset); err != nil {
-		return nil, err
-	}
-
-	// parse flags
-	var (
-		compression Compression
-	)
-	for n := 0; n < len(flags); {
-		code := flags[n]
-		switch code {
-		case flagCompression:
-			if n+1 >= len(flags) {
-				return nil, errBadFlags
-			}
-			compression = Compression(flags[n+1])
-			n += 2
-		default:
-			return nil, fmt.Errorf("cellstore: unknown flag %d", code)
-		}
-	}
-
-	// validate flags
-	if !compression.isValid() {
-		return nil, errInvalidCompression
-	}
+	indexOffset := int64(binary.LittleEndian.Uint64(tmp[:8]))
 
 	// read index
 	var index []blockInfo
 	var info blockInfo
 
-	for pos := indexOffset; pos < flagsOffset; {
+	for pos := indexOffset; pos < footerOffset; {
 		tmp = tmp[:2*binary.MaxVarintLen64]
-		if x := flagsOffset - pos; x < int64(len(tmp)) {
+		if x := footerOffset - pos; x < int64(len(tmp)) {
 			tmp = tmp[:int(x)]
 		}
 
@@ -102,7 +65,6 @@ func NewReader(r io.ReaderAt, size int64) (*Reader, error) {
 
 		index:       index,
 		indexOffset: indexOffset,
-		compression: compression,
 	}, nil
 }
 
@@ -156,23 +118,29 @@ func (r *Reader) readBlock(pos int) ([]byte, error) {
 		return nil, err
 	}
 
-	switch r.compression {
-	case SnappyCompression:
+	maxPos := len(raw) - 1
+
+	switch raw[maxPos] {
+	case blockNoCompression:
+		return raw[:maxPos], nil
+	case blockSnappyCompression:
 		defer releaseBuffer(raw)
 
-		sz, err := snappy.DecodedLen(raw)
+		sz, err := snappy.DecodedLen(raw[:maxPos])
 		if err != nil {
 			return nil, err
 		}
 
-		buf, err := snappy.Decode(fetchBuffer(sz), raw)
+		pln := fetchBuffer(sz)
+		buf, err := snappy.Decode(pln, raw[:maxPos])
 		if err != nil {
-			releaseBuffer(buf)
+			releaseBuffer(pln)
 			return nil, err
 		}
 		return buf, nil
 	default:
-		return raw, nil
+		releaseBuffer(raw)
+		return nil, errInvalidCompression
 	}
 }
 
