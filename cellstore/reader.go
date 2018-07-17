@@ -10,8 +10,6 @@ import (
 	"github.com/golang/snappy"
 )
 
-const earthRadius = 6378100.0 // in meters
-
 // Reader represents a cellstore reader
 type Reader struct {
 	r io.ReaderAt
