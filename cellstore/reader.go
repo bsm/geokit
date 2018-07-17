@@ -73,9 +73,9 @@ func (r *Reader) NumBlocks() int {
 	return len(r.index)
 }
 
-func (r *Reader) blockOffset(pos int) int64 {
-	if pos < len(r.index) {
-		return r.index[pos].Offset
+func (r *Reader) blockOffset(blockNo int) int64 {
+	if blockNo < len(r.index) {
+		return r.index[blockNo].Offset
 	}
 	return r.indexOffset
 }
@@ -86,29 +86,23 @@ func (r *Reader) FindBlock(cellID s2.CellID) (*Iterator, error) {
 		return nil, errInvalidCellID
 	}
 
-	iter := &Iterator{parent: r}
 	if len(r.index) == 0 {
-		return iter, nil
+		return &Iterator{parent: r}, nil
 	}
 
-	iter.pos = sort.Search(len(r.index), func(i int) bool {
+	blockPos := sort.Search(len(r.index), func(i int) bool {
 		return r.index[i].MaxCellID >= cellID
 	})
-	if iter.pos >= len(r.index) {
-		return iter, nil
+	if blockPos >= len(r.index) {
+		return &Iterator{parent: r}, nil
 	}
-
-	var err error
-	if iter.buf, err = r.readBlock(iter.pos); err != nil {
-		return nil, err
-	}
-	return iter, nil
+	return r.readBlock(blockPos)
 }
 
-func (r *Reader) readBlock(pos int) ([]byte, error) {
-	min := r.index[pos].Offset
+func (r *Reader) readBlock(blockNo int) (*Iterator, error) {
+	min := r.index[blockNo].Offset
 	max := r.indexOffset
-	if next := pos + 1; next < len(r.index) {
+	if next := blockNo + 1; next < len(r.index) {
 		max = r.index[next].Offset
 	}
 
@@ -118,11 +112,10 @@ func (r *Reader) readBlock(pos int) ([]byte, error) {
 		return nil, err
 	}
 
-	maxPos := len(raw) - 1
-
-	switch raw[maxPos] {
+	var buf []byte
+	switch maxPos := len(raw) - 1; raw[maxPos] {
 	case blockNoCompression:
-		return raw[:maxPos], nil
+		buf = raw[:maxPos]
 	case blockSnappyCompression:
 		defer releaseBuffer(raw)
 
@@ -132,30 +125,42 @@ func (r *Reader) readBlock(pos int) ([]byte, error) {
 		}
 
 		pln := fetchBuffer(sz)
-		buf, err := snappy.Decode(pln, raw[:maxPos])
+		res, err := snappy.Decode(pln, raw[:maxPos])
 		if err != nil {
 			releaseBuffer(pln)
 			return nil, err
 		}
-		return buf, nil
+		buf = res
 	default:
 		releaseBuffer(raw)
 		return nil, errInvalidCompression
 	}
+
+	eoi := len(buf) - 4
+	numEntries := int(binary.LittleEndian.Uint32(buf[eoi:]))
+	return &Iterator{
+		parent:     r,
+		blockNo:    blockNo,
+		numEntries: numEntries,
+		blockBuf:   buf[:eoi],
+		entryPos:   -1,
+	}, nil
 }
 
 // --------------------------------------------------------------------
 
 type Iterator struct {
-	parent *Reader
-	pos    int // block position
+	parent     *Reader
+	blockNo    int // block number
+	numEntries int // total number of entries
+	blockBuf   []byte
 
-	buf []byte
-	cur int // cursor position
+	cursor   int // buffer cursor position
+	entryPos int // current entry position
 
-	err error
-	cid s2.CellID
-	val []byte
+	cellID s2.CellID
+	value  []byte
+	err    error
 }
 
 // Next advances the cursor to the next entry
@@ -165,74 +170,88 @@ func (i *Iterator) Next() bool {
 	}
 
 	// read CellID
-	if i.cur+1 > len(i.buf) {
+	if i.cursor+1 > len(i.blockBuf) {
 		return false
 	}
-	key, n := binary.Uvarint(i.buf[i.cur:])
-	i.cid += s2.CellID(key)
-	i.cur += n
+	key, n := binary.Uvarint(i.blockBuf[i.cursor:])
+	i.cellID += s2.CellID(key)
+	i.cursor += n
 
 	// read value length
-	if i.cur+1 > len(i.buf) {
+	if i.cursor+1 > len(i.blockBuf) {
 		return false
 	}
-	vln, n := binary.Uvarint(i.buf[i.cur:])
-	i.cur += n
+	vln, n := binary.Uvarint(i.blockBuf[i.cursor:])
+	i.cursor += n
 
 	// read value
-	if i.cur+int(vln) > len(i.buf) {
+	if i.cursor+int(vln) > len(i.blockBuf) {
 		return false
 	}
-	i.val = i.buf[i.cur : i.cur+int(vln)]
-	i.cur += int(vln)
+	i.value = i.blockBuf[i.cursor : i.cursor+int(vln)]
+	i.cursor += int(vln)
+	i.entryPos++
 
 	return true
 }
 
+// Seek advances the cursor to the entry with CellID >= the given value.
+func (i *Iterator) Seek(cellID s2.CellID) bool {
+	if cellID >= i.cellID {
+		for i.Next() {
+			if i.cellID >= cellID {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // NextBlock jumps to the next block, returns true if successful.
 func (i *Iterator) NextBlock() bool {
-	return i.advance(i.pos + 1)
+	return i.advance(i.blockNo + 1)
 }
 
 // PrevBlock jumps to the previous block, returns true if successful.
 func (i *Iterator) PrevBlock() bool {
-	return i.advance(i.pos - 1)
+	return i.advance(i.blockNo - 1)
 }
 
-func (i *Iterator) advance(pos int) bool {
+func (i *Iterator) advance(blockNo int) bool {
 	if i.err != nil {
 		return false
 	}
 
-	if pos < 0 || pos >= len(i.parent.index) {
+	if blockNo < 0 || blockNo >= len(i.parent.index) {
 		return false
 	}
 
-	buf, err := i.parent.readBlock(pos)
+	j, err := i.parent.readBlock(blockNo)
 	if err != nil {
 		i.err = err
 		return false
 	}
 
-	releaseBuffer(i.buf)
-	*i = Iterator{
-		parent: i.parent,
-		pos:    pos,
-		buf:    buf,
-	}
+	i.Release()
+	*i = *j
 	return true
 }
 
 // CellID returns the cell ID of the current entry.
 func (i *Iterator) CellID() s2.CellID {
-	return i.cid
+	return i.cellID
 }
 
 // Value returns the value of the current entry. Please note that values
 // are temporary buffers and must be copied if used beyond the next Next() or
 // Release() function call.
 func (i *Iterator) Value() []byte {
-	return i.val
+	return i.value
+}
+
+// Len returns the number of entries in the current block.
+func (i *Iterator) Len() int {
+	return i.numEntries
 }
 
 // Err returns iterator errors
@@ -242,5 +261,5 @@ func (i *Iterator) Err() error {
 
 // Release releases the iterator. It must not be used once this method is called.
 func (i *Iterator) Release() {
-	releaseBuffer(i.buf)
+	releaseBuffer(i.blockBuf)
 }

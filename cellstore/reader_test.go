@@ -74,12 +74,12 @@ var _ = Describe("Reader", func() {
 		Expect(subject.NumBlocks()).To(Equal(7))
 		Expect(subject.index).To(Equal([]blockInfo{
 			{MaxCellID: 1317624576600000113, Offset: 0},
-			{MaxCellID: 1317624576600000233, Offset: 1974},
-			{MaxCellID: 1317624576600000353, Offset: 3948},
-			{MaxCellID: 1317624576600000473, Offset: 5922},
-			{MaxCellID: 1317624576600000593, Offset: 7896},
-			{MaxCellID: 1317624576600000713, Offset: 9870},
-			{MaxCellID: 1317624576600000793, Offset: 11844},
+			{MaxCellID: 1317624576600000233, Offset: 1978},
+			{MaxCellID: 1317624576600000353, Offset: 3956},
+			{MaxCellID: 1317624576600000473, Offset: 5934},
+			{MaxCellID: 1317624576600000593, Offset: 7912},
+			{MaxCellID: 1317624576600000713, Offset: 9890},
+			{MaxCellID: 1317624576600000793, Offset: 11868},
 		}))
 
 		setup(1000)
@@ -114,6 +114,29 @@ var _ = Describe("Reader", func() {
 			1317624576600000337, 1317624576600000345, 1317624576600000353,
 		}))
 		Expect(findBlock(1317624576600000795)).To(BeEmpty())
+	})
+
+	It("should iterate within a block", func() {
+		it, err := subject.FindBlock(1317624576600000297)
+		Expect(err).NotTo(HaveOccurred())
+		defer it.Release()
+
+		Expect(it.Len()).To(Equal(15))
+		Expect(it.blockNo).To(Equal(2))
+
+		Expect(it.Next()).To(BeTrue())
+		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000241)))
+		Expect(it.entryPos).To(Equal(0))
+
+		Expect(it.Seek(1317624576600000297)).To(BeTrue())
+		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000297)))
+		Expect(it.entryPos).To(Equal(7))
+
+		Expect(it.Seek(1317624576600000317)).To(BeTrue())
+		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000321)))
+		Expect(it.entryPos).To(Equal(10))
+
+		Expect(it.Seek(1317624576600000273)).To(BeFalse())
 	})
 
 	It("should reject invalid cell IDs", func() {

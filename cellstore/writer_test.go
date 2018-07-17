@@ -51,7 +51,7 @@ var _ = Describe("Writer", func() {
 		}
 		Expect(subject.Close()).To(Succeed())
 		Expect(len(subject.index)).To(Equal(807))
-		Expect(buf.Len()).To(BeNumerically("~", 6559707, 1000))
+		Expect(buf.Len()).To(BeNumerically("~", 6562935, KiB))
 		Expect(buf.Bytes()[buf.Len()-8:]).To(Equal(magic))
 	})
 
@@ -62,7 +62,7 @@ var _ = Describe("Writer", func() {
 		}
 		Expect(subject.Close()).To(Succeed())
 		Expect(len(subject.index)).To(Equal(807))
-		Expect(buf.Len()).To(BeNumerically("~", 329879, 1000))
+		Expect(buf.Len()).To(BeNumerically("~", 333914, KiB))
 		Expect(buf.Bytes()[buf.Len()-8:]).To(Equal(magic))
 	})
 

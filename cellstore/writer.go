@@ -14,12 +14,13 @@ type Writer struct {
 	w io.Writer
 	o Options
 
-	last   s2.CellID // the last cellID
-	offset int64     // the current offset
+	block blockInfo // the current block info
+	blen  int       // the number of block entries
 
-	buf   []byte
-	snp   []byte
-	tmp   []byte
+	buf []byte // plain buffer
+	snp []byte // snappy  buffer
+	tmp []byte // scratch buffer
+
 	index []blockInfo
 }
 
@@ -45,8 +46,8 @@ func (w *Writer) Append(cellID s2.CellID, data []byte) error {
 	}
 	if !cellID.IsValid() {
 		return errInvalidCellID
-	} else if w.last >= cellID {
-		return fmt.Errorf("cellstore: attempted an out-of-order append, %v must be > %v", cellID, w.last)
+	} else if w.block.MaxCellID >= cellID {
+		return fmt.Errorf("cellstore: attempted an out-of-order append, %v must be > %v", cellID, w.block.MaxCellID)
 	}
 
 	if len(w.buf) != 0 && len(w.buf)+len(data)+2*binary.MaxVarintLen64 > w.o.BlockSize {
@@ -55,16 +56,19 @@ func (w *Writer) Append(cellID s2.CellID, data []byte) error {
 		}
 	}
 
-	key := cellID
+	inc := cellID
 	if len(w.buf) != 0 { // delta-encode CellID
-		key -= w.last
+		inc -= w.block.MaxCellID
 	}
-	n := binary.PutUvarint(w.tmp[0:], uint64(key))
-	n += binary.PutUvarint(w.tmp[n:], uint64(len(data)))
 
+	n := binary.PutUvarint(w.tmp[0:], uint64(inc))
+	n += binary.PutUvarint(w.tmp[n:], uint64(len(data)))
 	w.buf = append(w.buf, w.tmp[:n]...)
 	w.buf = append(w.buf, data...)
-	w.last = cellID
+
+	w.blen++
+	w.block.MaxCellID = cellID
+
 	return nil
 }
 
@@ -77,7 +81,7 @@ func (w *Writer) Close() error {
 		return err
 	}
 
-	indexOffset := w.offset
+	indexOffset := w.block.Offset
 	if err := w.writeIndex(); err != nil {
 		return err
 	}
@@ -90,17 +94,20 @@ func (w *Writer) Close() error {
 }
 
 func (w *Writer) writeIndex() error {
-	var last blockInfo
+	var prev blockInfo
+
 	for i, ent := range w.index {
-		cid, off := ent.MaxCellID, ent.Offset
+		cid := ent.MaxCellID
+		off := ent.Offset
 		if i > 0 { // delta-encode
-			cid -= last.MaxCellID
-			off -= last.Offset
+			cid -= prev.MaxCellID
+			off -= prev.Offset
 		}
-		last = ent
+		prev = ent
 
 		n := binary.PutUvarint(w.tmp[0:], uint64(cid))
 		n += binary.PutUvarint(w.tmp[n:], uint64(off))
+
 		if err := w.writeRaw(w.tmp[:n]); err != nil {
 			return err
 		}
@@ -121,7 +128,7 @@ func (w *Writer) writeFooter(indexOffset int64) error {
 
 func (w *Writer) writeRaw(p []byte) error {
 	n, err := w.w.Write(p)
-	w.offset += int64(n)
+	w.block.Offset += int64(n)
 	return err
 }
 
@@ -130,10 +137,8 @@ func (w *Writer) flush() error {
 		return nil
 	}
 
-	w.index = append(w.index, blockInfo{
-		MaxCellID: w.last,
-		Offset:    w.offset,
-	})
+	binary.LittleEndian.PutUint32(w.tmp, uint32(w.blen))
+	w.buf = append(w.buf, w.tmp[:4]...)
 
 	var block []byte
 	switch w.o.Compression {
@@ -148,6 +153,9 @@ func (w *Writer) flush() error {
 		block = append(w.buf, blockNoCompression)
 	}
 
+	w.index = append(w.index, w.block)
 	w.buf = w.buf[:0]
+	w.blen = 0
+
 	return w.writeRaw(block)
 }
