@@ -149,23 +149,25 @@ func (r *Reader) readBlock(blockNo int) (*Iterator, error) {
 	}, nil
 }
 
-type Near struct {
+type near struct {
 	CellID   s2.CellID
 	Value    []byte
-	Distance int32
+	Distance float64
 }
 
-type Nearby []*Near
-type ByDistance []*Near
+type nearby []near
 
-func (n ByDistance) Len() int           { return len(n) }
-func (n ByDistance) Swap(i, j int)      { n[i], n[j] = n[j], n[i] }
-func (n ByDistance) Less(i, j int) bool { return n[i].Distance < n[j].Distance }
+func (n nearby) Len() int      { return len(n) }
+func (n nearby) Swap(i, j int) { n[i], n[j] = n[j], n[i] }
+
+type byDistance struct{ nearby }
+
+func (n byDistance) Less(i, j int) bool { return n.nearby[i].Distance < n.nearby[j].Distance }
 
 // FindNearby
-func (r *Reader) FindNearby(loc s2.CellID, limit int) (Nearby, error) {
+func (r *Reader) FindNearby(loc s2.CellID, limit int) (nearby, error) {
 
-	var dst Nearby
+	var dst nearby
 
 	// find the block
 	it, err := r.FindBlock(loc)
@@ -183,8 +185,8 @@ func (r *Reader) FindNearby(loc s2.CellID, limit int) (Nearby, error) {
 			after += 1
 		}
 
-		dist := int32(earthRadius * it.CellID().LatLng().Distance(loc.LatLng()).Radians())
-		dst = append(dst, &Near{CellID: it.CellID(), Value: it.Value(), Distance: dist})
+		dist := float64(s2.CellFromCellID(it.CellID()).Distance(loc.Point()))
+		dst = append(dst, near{CellID: it.CellID(), Value: it.Value(), Distance: dist})
 
 		// break if we have enough records after the pivot
 		if after >= limit {
@@ -194,9 +196,10 @@ func (r *Reader) FindNearby(loc s2.CellID, limit int) (Nearby, error) {
 
 	// prepend previous blocks values if required
 	if before < limit && it.PrevBlock() {
-		var res Nearby
+		var res nearby
 		for it.Next() {
-			res = append(res, &Near{CellID: it.CellID(), Value: it.Value()})
+			dist := float64(s2.CellFromCellID(it.CellID()).Distance(loc.Point()))
+			res = append(res, near{CellID: it.CellID(), Value: it.Value(), Distance: dist})
 		}
 		res = res[len(res)-(limit-before):]
 		dst = append(res, dst...)
@@ -207,8 +210,8 @@ func (r *Reader) FindNearby(loc s2.CellID, limit int) (Nearby, error) {
 		for it.Next() {
 			after += 1
 
-			dist := int32(earthRadius * it.CellID().LatLng().Distance(loc.LatLng()).Radians())
-			dst = append(dst, &Near{CellID: it.CellID(), Value: it.Value(), Distance: dist})
+			dist := float64(s2.CellFromCellID(it.CellID()).Distance(loc.Point()))
+			dst = append(dst, near{CellID: it.CellID(), Value: it.Value(), Distance: dist})
 
 			// break if we have enough records after the pivot
 			if after >= limit {
@@ -218,7 +221,7 @@ func (r *Reader) FindNearby(loc s2.CellID, limit int) (Nearby, error) {
 	}
 
 	// sort the results
-	sort.Sort(ByDistance(dst))
+	sort.Sort(byDistance{dst})
 
 	if len(dst) < limit {
 		return dst, nil
