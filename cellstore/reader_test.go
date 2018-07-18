@@ -20,7 +20,7 @@ var _ = Describe("Reader", func() {
 		rnd := rand.New(rand.NewSource(1))
 		val := make([]byte, 128)
 
-		w := NewWriter(buf, &Options{BlockSize: 2 * KiB})
+		w := NewWriter(buf, &Options{BlockSize: 2 * KiB, SectionSize: 4})
 		for i := 0; i < 8*n; i += 8 {
 			_, err := rnd.Read(val)
 			Expect(err).NotTo(HaveOccurred())
@@ -74,12 +74,12 @@ var _ = Describe("Reader", func() {
 		Expect(subject.NumBlocks()).To(Equal(7))
 		Expect(subject.index).To(Equal([]blockInfo{
 			{MaxCellID: 1317624576600000113, Offset: 0},
-			{MaxCellID: 1317624576600000233, Offset: 1978},
-			{MaxCellID: 1317624576600000353, Offset: 3956},
-			{MaxCellID: 1317624576600000473, Offset: 5934},
-			{MaxCellID: 1317624576600000593, Offset: 7912},
-			{MaxCellID: 1317624576600000713, Offset: 9890},
-			{MaxCellID: 1317624576600000793, Offset: 11868},
+			{MaxCellID: 1317624576600000233, Offset: 2014},
+			{MaxCellID: 1317624576600000353, Offset: 4028},
+			{MaxCellID: 1317624576600000473, Offset: 6042},
+			{MaxCellID: 1317624576600000593, Offset: 8056},
+			{MaxCellID: 1317624576600000713, Offset: 10070},
+			{MaxCellID: 1317624576600000793, Offset: 12084},
 		}))
 
 		setup(1000)
@@ -121,20 +121,21 @@ var _ = Describe("Reader", func() {
 		Expect(err).NotTo(HaveOccurred())
 		defer it.Release()
 
-		Expect(it.Len()).To(Equal(15))
+		Expect(it.index).To(HaveLen(4))
 		Expect(it.blockNo).To(Equal(2))
+		Expect(it.sectionNo).To(Equal(0))
 
 		Expect(it.Next()).To(BeTrue())
 		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000241)))
-		Expect(it.entryPos).To(Equal(0))
+		Expect(it.sectionNo).To(Equal(0))
 
 		Expect(it.Seek(1317624576600000297)).To(BeTrue())
 		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000297)))
-		Expect(it.entryPos).To(Equal(7))
+		Expect(it.sectionNo).To(Equal(1))
 
 		Expect(it.Seek(1317624576600000317)).To(BeTrue())
 		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000321)))
-		Expect(it.entryPos).To(Equal(10))
+		Expect(it.sectionNo).To(Equal(2))
 
 		Expect(it.Seek(1317624576600000273)).To(BeFalse())
 	})

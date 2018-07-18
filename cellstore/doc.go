@@ -36,7 +36,7 @@ index and a single-byte compression type indicator.
 
     Section index:
     +----------------------------+-------+----------------------------+-------------------------------+
-    | section offset 1 (4 bytes) |  ...  | section offset n (4 bytes) |  number of sections (4 bytes) |
+    | section offset 2 (4 bytes) |  ...  | section offset n (4 bytes) |  number of sections (4 bytes) |
     +----------------------------+-------+----------------------------+-------------------------------+
 
 Section

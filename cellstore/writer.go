@@ -141,8 +141,10 @@ func (w *Writer) flush() error {
 	}
 
 	for _, o := range w.soffs {
-		binary.LittleEndian.PutUint32(w.tmp, uint32(o))
-		w.buf = append(w.buf, w.tmp[:4]...)
+		if o > 0 {
+			binary.LittleEndian.PutUint32(w.tmp, uint32(o))
+			w.buf = append(w.buf, w.tmp[:4]...)
+		}
 	}
 	binary.LittleEndian.PutUint32(w.tmp, uint32(len(w.soffs)))
 	w.buf = append(w.buf, w.tmp[:4]...)
@@ -151,7 +153,7 @@ func (w *Writer) flush() error {
 	switch w.o.Compression {
 	case SnappyCompression:
 		w.snp = snappy.Encode(w.snp[:cap(w.snp)], w.buf)
-		if len(w.snp) < len(w.buf)-len(w.buf)/8 {
+		if len(w.snp) < len(w.buf)-len(w.buf)/4 {
 			block = append(w.snp, blockSnappyCompression)
 		} else {
 			block = append(w.buf, blockNoCompression)

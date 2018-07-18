@@ -65,8 +65,7 @@ func BenchmarkReader(b *testing.B) {
 			if err != nil {
 				b.Fatalf("error finding cell %d: %v", cellID, err)
 			}
-			for it.Next() {
-			}
+			Expect(it.Next()).To(BeTrue())
 			if err := it.Err(); err != nil {
 				b.Fatalf("error iterating over block containing cell %d: %v", cellID, err)
 			}

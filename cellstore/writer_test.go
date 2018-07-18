@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = FDescribe("Writer", func() {
+var _ = Describe("Writer", func() {
 	var buf *bytes.Buffer
 	var subject *Writer
 	var cellID = s2.CellID(1317624576600000001)
@@ -50,8 +50,8 @@ var _ = FDescribe("Writer", func() {
 			Expect(subject.Append(cellID+s2.CellID(i), val)).To(Succeed())
 		}
 		Expect(subject.Close()).To(Succeed())
-		Expect(len(subject.index)).To(Equal(807))
-		Expect(buf.Len()).To(BeNumerically("~", 6562935, KiB))
+		Expect(len(subject.index)).To(Equal(404))
+		Expect(buf.Len()).To(BeNumerically("~", 6590753, KiB))
 		Expect(buf.Bytes()[buf.Len()-8:]).To(Equal(magic))
 	})
 
@@ -61,8 +61,8 @@ var _ = FDescribe("Writer", func() {
 			Expect(subject.Append(cellID+s2.CellID(i), val)).To(Succeed())
 		}
 		Expect(subject.Close()).To(Succeed())
-		Expect(len(subject.index)).To(Equal(807))
-		Expect(buf.Len()).To(BeNumerically("~", 333914, KiB))
+		Expect(len(subject.index)).To(Equal(404))
+		Expect(buf.Len()).To(BeNumerically("~", 340474, KiB))
 		Expect(buf.Bytes()[buf.Len()-8:]).To(Equal(magic))
 	})
 

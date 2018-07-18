@@ -136,27 +136,35 @@ func (r *Reader) readBlock(blockNo int) (*Iterator, error) {
 		return nil, errInvalidCompression
 	}
 
-	eoi := len(buf) - 4
-	numEntries := int(binary.LittleEndian.Uint32(buf[eoi:]))
+	numSectionsOffset := len(buf) - 4
+	numSections := int(binary.LittleEndian.Uint32(buf[numSectionsOffset:]))
+
+	sectionIndexOffset := len(buf) - numSections*4
+	sectionIndex := append(make([]int, 0, numSections), 0)
+	for n := sectionIndexOffset; n < numSectionsOffset; n += 4 {
+		sectionIndex = append(sectionIndex, int(binary.LittleEndian.Uint32(buf[n:])))
+	}
+
 	return &Iterator{
-		parent:     r,
-		blockNo:    blockNo,
-		numEntries: numEntries,
-		blockBuf:   buf[:eoi],
-		entryPos:   -1,
+		parent:      r,
+		blockNo:     blockNo,
+		index:       sectionIndex,
+		indexOffset: sectionIndexOffset,
+		buf:         buf,
 	}, nil
 }
 
 // --------------------------------------------------------------------
 
 type Iterator struct {
-	parent     *Reader
-	blockNo    int // block number
-	numEntries int // total number of entries
-	blockBuf   []byte
+	parent      *Reader
+	blockNo     int   // block number
+	sectionNo   int   // section number
+	index       []int // section index
+	indexOffset int   // section index offset
 
-	cursor   int // buffer cursor position
-	entryPos int // current entry position
+	buf []byte
+	nr  int // number of buffer bytes read
 
 	cellID s2.CellID
 	value  []byte
@@ -169,34 +177,43 @@ func (i *Iterator) Next() bool {
 		return false
 	}
 
-	// read CellID
-	if i.cursor+1 > len(i.blockBuf) {
+	// increment section and read CellID
+	if i.nr+1 > i.indexOffset {
 		return false
 	}
-	key, n := binary.Uvarint(i.blockBuf[i.cursor:])
+	if nsn := i.sectionNo + 1; nsn < len(i.index) && i.index[nsn] == i.nr {
+		i.cellID = 0
+		i.sectionNo++
+	}
+	key, n := binary.Uvarint(i.buf[i.nr:])
+	i.nr += n
 	i.cellID += s2.CellID(key)
-	i.cursor += n
 
 	// read value length
-	if i.cursor+1 > len(i.blockBuf) {
+	if i.nr+1 > i.indexOffset {
 		return false
 	}
-	vln, n := binary.Uvarint(i.blockBuf[i.cursor:])
-	i.cursor += n
+	vln, n := binary.Uvarint(i.buf[i.nr:])
+	i.nr += n
 
 	// read value
-	if i.cursor+int(vln) > len(i.blockBuf) {
+	if i.nr+int(vln) > i.indexOffset {
 		return false
 	}
-	i.value = i.blockBuf[i.cursor : i.cursor+int(vln)]
-	i.cursor += int(vln)
-	i.entryPos++
+	i.value = i.buf[i.nr : i.nr+int(vln)]
+	i.nr += int(vln)
 
 	return true
 }
 
 // Seek advances the cursor to the entry with CellID >= the given value.
 func (i *Iterator) Seek(cellID s2.CellID) bool {
+	// pos := sort.Search(len(i.index), func(i int) bool {
+	// 	return s2.CellID(binary.Uvarint(i.index[i])) >= cellID
+	// })
+
+	// fmt.Println(pos, len(i.index))
+
 	if cellID >= i.cellID {
 		for i.Next() {
 			if i.cellID >= cellID {
@@ -249,11 +266,6 @@ func (i *Iterator) Value() []byte {
 	return i.value
 }
 
-// Len returns the number of entries in the current block.
-func (i *Iterator) Len() int {
-	return i.numEntries
-}
-
 // Err returns iterator errors
 func (i *Iterator) Err() error {
 	return i.err
@@ -261,5 +273,5 @@ func (i *Iterator) Err() error {
 
 // Release releases the iterator. It must not be used once this method is called.
 func (i *Iterator) Release() {
-	releaseBuffer(i.blockBuf)
+	releaseBuffer(i.buf)
 }
