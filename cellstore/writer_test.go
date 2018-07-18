@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Writer", func() {
+var _ = FDescribe("Writer", func() {
 	var buf *bytes.Buffer
 	var subject *Writer
 	var cellID = s2.CellID(1317624576600000001)
