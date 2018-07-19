@@ -208,17 +208,22 @@ func (i *Iterator) Next() bool {
 
 // Seek advances the cursor to the entry with CellID >= the given value.
 func (i *Iterator) Seek(cellID s2.CellID) bool {
-	// pos := sort.Search(len(i.index), func(i int) bool {
-	// 	return s2.CellID(binary.Uvarint(i.index[i])) >= cellID
-	// })
+	spos := sort.Search(len(i.index), func(n int) bool {
+		off := i.index[n]
+		first, _ := binary.Uvarint(i.buf[off:])
+		return s2.CellID(first) >= cellID
+	})
 
-	// fmt.Println(pos, len(i.index))
+	i.nr = 0
+	i.cellID = 0
+	i.sectionNo = spos - 1
+	if spos > 0 {
+		i.nr = i.index[i.sectionNo]
+	}
 
-	if cellID >= i.cellID {
-		for i.Next() {
-			if i.cellID >= cellID {
-				return true
-			}
+	for i.Next() {
+		if i.cellID >= cellID {
+			return true
 		}
 	}
 	return false

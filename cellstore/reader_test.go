@@ -107,16 +107,15 @@ var _ = Describe("Reader", func() {
 			1317624576600000337, 1317624576600000345, 1317624576600000353,
 		}))
 		Expect(findBlock(1317624576600000307)).To(Equal([]s2.CellID{
-			1317624576600000241, 1317624576600000249, 1317624576600000257,
-			1317624576600000265, 1317624576600000273, 1317624576600000281,
-			1317624576600000289, 1317624576600000297, 1317624576600000305,
-			1317624576600000313, 1317624576600000321, 1317624576600000329,
+			1317624576600000241, 1317624576600000249, 1317624576600000257, 1317624576600000265,
+			1317624576600000273, 1317624576600000281, 1317624576600000289, 1317624576600000297,
+			1317624576600000305, 1317624576600000313, 1317624576600000321, 1317624576600000329,
 			1317624576600000337, 1317624576600000345, 1317624576600000353,
 		}))
 		Expect(findBlock(1317624576600000795)).To(BeEmpty())
 	})
 
-	It("should iterate within a block", func() {
+	It("should seek within a block", func() {
 		it, err := subject.FindBlock(1317624576600000297)
 		Expect(err).NotTo(HaveOccurred())
 		defer it.Release()
@@ -129,6 +128,10 @@ var _ = Describe("Reader", func() {
 		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000241)))
 		Expect(it.sectionNo).To(Equal(0))
 
+		Expect(it.Seek(1317624576600000240)).To(BeTrue())
+		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000241)))
+		Expect(it.sectionNo).To(Equal(0))
+
 		Expect(it.Seek(1317624576600000297)).To(BeTrue())
 		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000297)))
 		Expect(it.sectionNo).To(Equal(1))
@@ -137,7 +140,39 @@ var _ = Describe("Reader", func() {
 		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000321)))
 		Expect(it.sectionNo).To(Equal(2))
 
-		Expect(it.Seek(1317624576600000273)).To(BeFalse())
+		Expect(it.Seek(1317624576600000305)).To(BeTrue())
+		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000305)))
+		Expect(it.sectionNo).To(Equal(2))
+
+		Expect(it.Seek(1317624576600000307)).To(BeTrue())
+		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000313)))
+		Expect(it.sectionNo).To(Equal(2))
+
+		Expect(it.Seek(1317624576600000273)).To(BeTrue())
+		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000273)))
+		Expect(it.sectionNo).To(Equal(1))
+
+		Expect(it.Seek(1317624576600000261)).To(BeTrue())
+		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000265)))
+		Expect(it.sectionNo).To(Equal(0))
+
+		Expect(it.Seek(1317624576600000265)).To(BeTrue())
+		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000265)))
+		Expect(it.sectionNo).To(Equal(0))
+
+		Expect(it.Seek(1317624576600000337)).To(BeTrue())
+		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000337)))
+		Expect(it.sectionNo).To(Equal(3))
+
+		Expect(it.Seek(1317624576600000241)).To(BeTrue())
+		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000241)))
+		Expect(it.sectionNo).To(Equal(0))
+
+		Expect(it.Seek(1317624576600000353)).To(BeTrue())
+		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000353)))
+		Expect(it.sectionNo).To(Equal(3))
+
+		Expect(it.Seek(1317624576600000355)).To(BeFalse())
 	})
 
 	It("should reject invalid cell IDs", func() {
