@@ -73,9 +73,9 @@ func (r *Reader) NumBlocks() int {
 	return len(r.index)
 }
 
-func (r *Reader) blockOffset(blockNo int) int64 {
-	if blockNo < len(r.index) {
-		return r.index[blockNo].Offset
+func (r *Reader) blockOffset(blockNum int) int64 {
+	if blockNum < len(r.index) {
+		return r.index[blockNum].Offset
 	}
 	return r.indexOffset
 }
@@ -99,10 +99,10 @@ func (r *Reader) FindBlock(cellID s2.CellID) (*Iterator, error) {
 	return r.readBlock(blockPos)
 }
 
-func (r *Reader) readBlock(blockNo int) (*Iterator, error) {
-	min := r.index[blockNo].Offset
+func (r *Reader) readBlock(blockNum int) (*Iterator, error) {
+	min := r.index[blockNum].Offset
 	max := r.indexOffset
-	if next := blockNo + 1; next < len(r.index) {
+	if next := blockNum + 1; next < len(r.index) {
 		max = r.index[next].Offset
 	}
 
@@ -136,35 +136,31 @@ func (r *Reader) readBlock(blockNo int) (*Iterator, error) {
 		return nil, errInvalidCompression
 	}
 
-	numSectionsOffset := len(buf) - 4
-	numSections := int(binary.LittleEndian.Uint32(buf[numSectionsOffset:]))
-
-	sectionIndexOffset := len(buf) - numSections*4
-	sectionIndex := append(make([]int, 0, numSections), 0)
-	for n := sectionIndexOffset; n < numSectionsOffset; n += 4 {
-		sectionIndex = append(sectionIndex, int(binary.LittleEndian.Uint32(buf[n:])))
+	numSections := int(binary.LittleEndian.Uint32(buf[len(buf)-4:]))
+	indexOffset := len(buf) - numSections*4
+	index := append(make([]int, 0, numSections), 0)
+	for n := indexOffset; n < len(buf)-4; n += 4 {
+		index = append(index, int(binary.LittleEndian.Uint32(buf[n:])))
 	}
 
 	return &Iterator{
-		parent:      r,
-		blockNo:     blockNo,
-		index:       sectionIndex,
-		indexOffset: sectionIndexOffset,
-		buf:         buf,
+		parent:   r,
+		blockNum: blockNum,
+		index:    index,
+		buf:      buf[:indexOffset],
 	}, nil
 }
 
 // --------------------------------------------------------------------
 
 type Iterator struct {
-	parent      *Reader
-	blockNo     int   // block number
-	sectionNo   int   // section number
-	index       []int // section index
-	indexOffset int   // section index offset
+	parent     *Reader
+	blockNum   int   // block number
+	sectionNum int   // section number
+	index      []int // section index
 
-	buf []byte
-	nr  int // number of buffer bytes read
+	buf    []byte // block buffer
+	bufOff int    // number of buffer bytes read
 
 	cellID s2.CellID
 	value  []byte
@@ -178,47 +174,60 @@ func (i *Iterator) Next() bool {
 	}
 
 	// increment section and read CellID
-	if i.nr+1 > i.indexOffset {
+	if i.bufOff+1 > len(i.buf) {
 		return false
 	}
-	if nsn := i.sectionNo + 1; nsn < len(i.index) && i.index[nsn] == i.nr {
+	if nsn := i.sectionNum + 1; nsn < len(i.index) && i.index[nsn] == i.bufOff {
 		i.cellID = 0
-		i.sectionNo++
+		i.sectionNum++
 	}
-	key, n := binary.Uvarint(i.buf[i.nr:])
-	i.nr += n
+	key, n := binary.Uvarint(i.buf[i.bufOff:])
+	i.bufOff += n
 	i.cellID += s2.CellID(key)
 
 	// read value length
-	if i.nr+1 > i.indexOffset {
+	if i.bufOff+1 > len(i.buf) {
 		return false
 	}
-	vln, n := binary.Uvarint(i.buf[i.nr:])
-	i.nr += n
+	vln, n := binary.Uvarint(i.buf[i.bufOff:])
+	i.bufOff += n
 
 	// read value
-	if i.nr+int(vln) > i.indexOffset {
+	if i.bufOff+int(vln) > len(i.buf) {
 		return false
 	}
-	i.value = i.buf[i.nr : i.nr+int(vln)]
-	i.nr += int(vln)
+	i.value = i.buf[i.bufOff : i.bufOff+int(vln)]
+	i.bufOff += int(vln)
 
 	return true
 }
 
-// Seek advances the cursor to the entry with CellID >= the given value.
-func (i *Iterator) Seek(cellID s2.CellID) bool {
-	spos := sort.Search(len(i.index), func(n int) bool {
+// SeekSection advances the cursor to the section with the first cell >= cellID.
+func (i *Iterator) SeekSection(cellID s2.CellID) bool {
+	pos := sort.Search(len(i.index), func(n int) bool {
 		off := i.index[n]
 		first, _ := binary.Uvarint(i.buf[off:])
-		return s2.CellID(first) >= cellID
-	})
+		return s2.CellID(first) > cellID
+	}) - 1
 
-	i.nr = 0
+	if pos < 0 {
+		pos = 0
+	}
 	i.cellID = 0
-	i.sectionNo = spos - 1
-	if spos > 0 {
-		i.nr = i.index[i.sectionNo]
+	i.bufOff = i.index[pos]
+	i.sectionNum = pos
+
+	return i.Next()
+}
+
+// SeekSection advances the cursor to the cell >= cellID
+func (i *Iterator) Seek(cellID s2.CellID) bool {
+	if !i.SeekSection(cellID) {
+		return false
+	}
+
+	if i.cellID >= cellID {
+		return true
 	}
 
 	for i.Next() {
@@ -231,24 +240,24 @@ func (i *Iterator) Seek(cellID s2.CellID) bool {
 
 // NextBlock jumps to the next block, returns true if successful.
 func (i *Iterator) NextBlock() bool {
-	return i.advance(i.blockNo + 1)
+	return i.advanceBlock(i.blockNum + 1)
 }
 
 // PrevBlock jumps to the previous block, returns true if successful.
 func (i *Iterator) PrevBlock() bool {
-	return i.advance(i.blockNo - 1)
+	return i.advanceBlock(i.blockNum - 1)
 }
 
-func (i *Iterator) advance(blockNo int) bool {
+func (i *Iterator) advanceBlock(blockNum int) bool {
 	if i.err != nil {
 		return false
 	}
 
-	if blockNo < 0 || blockNo >= len(i.parent.index) {
+	if blockNum < 0 || blockNum >= len(i.parent.index) {
 		return false
 	}
 
-	j, err := i.parent.readBlock(blockNo)
+	j, err := i.parent.readBlock(blockNum)
 	if err != nil {
 		i.err = err
 		return false
@@ -257,6 +266,18 @@ func (i *Iterator) advance(blockNo int) bool {
 	i.Release()
 	*i = *j
 	return true
+}
+
+// firstInSection advances the cursor to the first item in secion num
+func (i *Iterator) firstInSection(num int) bool {
+	if num < 0 || num >= len(i.index) {
+		return false
+	}
+
+	i.cellID = 0
+	i.sectionNum = num
+	i.bufOff = i.index[num]
+	return i.Next()
 }
 
 // CellID returns the cell ID of the current entry.
