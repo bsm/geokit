@@ -15,6 +15,8 @@ func TestSuite(t *testing.T) {
 	RunSpecs(t, "geokit/cellstore")
 }
 
+// --------------------------------------------------------------------
+
 func BenchmarkReader(b *testing.B) {
 	const minID = s2.CellID(1317624576693539401)
 	var value = []byte("testdatatestdatatestdata")
