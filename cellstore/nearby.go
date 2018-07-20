@@ -1,9 +1,7 @@
 package cellstore
 
 import (
-	"fmt"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/golang/geo/s2"
@@ -49,19 +47,11 @@ func (i *NearbyIterator) Err() error {
 
 type nearbyEntry struct {
 	s2.CellID
-	num int // block number
-	off int // block offset
+	bnum int // block number
+	boff int // block offset
 }
 
 type nearbySlice []nearbyEntry
-
-func (s nearbySlice) String() string {
-	nums := make([]string, len(s))
-	for i, e := range s {
-		nums[i] = fmt.Sprintf("%d", e.CellID)
-	}
-	return strings.Join(nums, ",")
-}
 
 func (s nearbySlice) SortByDistance(origin s2.CellID) {
 	sort.Slice(s, func(i, j int) bool {
@@ -83,39 +73,15 @@ func (s nearbySlice) Limit(limit int) nearbySlice {
 	return s
 }
 
-func (s nearbySlice) Shift() nearbySlice {
-	if n := len(s); n > 0 {
-		copy(s, s[1:])
-		return s[:n-1]
-	}
-	return s
-}
-
-func (s nearbySlice) PushLeft(e nearbyEntry) nearbySlice {
-	if len(s) == cap(s) {
-		s = s.Shift()
-	}
-	return append(s, e)
-}
-
-func (s nearbySlice) PushRight(e nearbyEntry) nearbySlice {
-	if len(s) < cap(s) {
-		s = append(s, e)
-	}
-	return s
-}
-
 // --------------------------------------------------------------------
 
 var nearbySlicePool sync.Pool
 
-func fetchNearbySlice(minCap int) nearbySlice {
+func fetchNearbySlice(cp int) nearbySlice {
 	if v := nearbySlicePool.Get(); v != nil {
-		if p := v.(nearbySlice); minCap <= cap(p) {
-			return p[:0]
-		}
+		return v.(nearbySlice)[:0]
 	}
-	return make(nearbySlice, 0, minCap)
+	return make(nearbySlice, 0, cp)
 }
 
 func releaseNearbySlice(p nearbySlice) {

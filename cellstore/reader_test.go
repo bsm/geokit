@@ -51,14 +51,14 @@ var _ = Describe("Reader", func() {
 	})
 
 	It("should find blocks", func() {
-		Expect(minMax(findBlock(1317624576599999999))).To(Equal([]s2.CellID{1317624576600000001, 1317624576600000113}))
-		Expect(minMax(findBlock(1317624576600000001))).To(Equal([]s2.CellID{1317624576600000001, 1317624576600000113}))
-		Expect(minMax(findBlock(1317624576600000113))).To(Equal([]s2.CellID{1317624576600000001, 1317624576600000113}))
-		Expect(minMax(findBlock(1317624576600000115))).To(Equal([]s2.CellID{1317624576600000121, 1317624576600000233}))
-		Expect(minMax(findBlock(1317624576600000121))).To(Equal([]s2.CellID{1317624576600000121, 1317624576600000233}))
-		Expect(minMax(findBlock(1317624576600000233))).To(Equal([]s2.CellID{1317624576600000121, 1317624576600000233}))
-		Expect(minMax(findBlock(1317624576600000721))).To(Equal([]s2.CellID{1317624576600000721, 1317624576600000793}))
-		Expect(minMax(findBlock(1317624576600000793))).To(Equal([]s2.CellID{1317624576600000721, 1317624576600000793}))
+		Expect(findBlock(1317624576599999999)).To(coverRange(1317624576600000001, 1317624576600000113))
+		Expect(findBlock(1317624576600000001)).To(coverRange(1317624576600000001, 1317624576600000113))
+		Expect(findBlock(1317624576600000113)).To(coverRange(1317624576600000001, 1317624576600000113))
+		Expect(findBlock(1317624576600000115)).To(coverRange(1317624576600000121, 1317624576600000233))
+		Expect(findBlock(1317624576600000121)).To(coverRange(1317624576600000121, 1317624576600000233))
+		Expect(findBlock(1317624576600000233)).To(coverRange(1317624576600000121, 1317624576600000233))
+		Expect(findBlock(1317624576600000721)).To(coverRange(1317624576600000721, 1317624576600000793))
+		Expect(findBlock(1317624576600000793)).To(coverRange(1317624576600000721, 1317624576600000793))
 
 		Expect(findBlock(1317624576600000305)).To(Equal([]s2.CellID{
 			1317624576600000241, 1317624576600000249, 1317624576600000257, 1317624576600000265,
@@ -110,21 +110,4 @@ func seedReader(n int) *Reader {
 	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
 	Expect(err).NotTo(HaveOccurred())
 	return r
-}
-
-func minMax(cells []s2.CellID, err error) ([]s2.CellID, error) {
-	if err != nil {
-		return nil, err
-	}
-
-	var min, max s2.CellID
-	for _, c := range cells {
-		if v := c; min == 0 || v < min {
-			min = v
-		}
-		if v := c; max == 0 || v > max {
-			max = v
-		}
-	}
-	return []s2.CellID{min, max}, nil
 }

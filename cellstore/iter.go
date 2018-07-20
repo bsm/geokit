@@ -9,56 +9,57 @@ import (
 
 // Iterator is a block iterator returned by the Reader
 type Iterator struct {
-	parent     *Reader
-	blockNum   int   // block number
-	sectionNum int   // section number
-	index      []int // section index
+	parent *Reader
 
-	buf    []byte // block buffer
-	bufOff int    // number of buffer bytes read
+	buf  []byte // block buffer
+	bnum int    // block number
+	boff int    // block offset
+
+	index []int // section index
+	snum  int   // section number
 
 	cellID s2.CellID
 	value  []byte
 	err    error
 }
 
-// Next advances the cursor to the next entry
+// Next reads the next entry and advances the cursor.
 func (i *Iterator) Next() bool {
 	if i.err != nil {
 		return false
 	}
 
 	// increment section and read CellID
-	if i.bufOff+1 > len(i.buf) {
+	if i.boff+1 > len(i.buf) {
 		return false
 	}
-	if nsn := i.sectionNum + 1; nsn < len(i.index) && i.index[nsn] == i.bufOff {
+	if nsn := i.snum + 1; nsn < len(i.index) && i.index[nsn] == i.boff {
 		i.cellID = 0
-		i.sectionNum++
+		i.snum++
 	}
-	key, n := binary.Uvarint(i.buf[i.bufOff:])
-	i.bufOff += n
+	key, n := binary.Uvarint(i.buf[i.boff:])
+	i.boff += n
 	i.cellID += s2.CellID(key)
 
 	// read value length
-	if i.bufOff+1 > len(i.buf) {
+	if i.boff+1 > len(i.buf) {
 		return false
 	}
-	vln, n := binary.Uvarint(i.buf[i.bufOff:])
-	i.bufOff += n
+	vln, n := binary.Uvarint(i.buf[i.boff:])
+	i.boff += n
 
 	// read value
-	if i.bufOff+int(vln) > len(i.buf) {
+	if i.boff+int(vln) > len(i.buf) {
 		return false
 	}
-	i.value = i.buf[i.bufOff : i.bufOff+int(vln)]
-	i.bufOff += int(vln)
+	i.value = i.buf[i.boff : i.boff+int(vln)]
+	i.boff += int(vln)
 
 	return true
 }
 
-// SeekSection advances the cursor to the section with the first cell >= cellID.
-func (i *Iterator) SeekSection(cellID s2.CellID) bool {
+// SeekSection positions the cursor at the section with the first cell >= cellID within the current block.
+func (i *Iterator) SeekSection(cellID s2.CellID) {
 	pos := sort.Search(len(i.index), func(n int) bool {
 		off := i.index[n]
 		first, _ := binary.Uvarint(i.buf[off:])
@@ -69,68 +70,86 @@ func (i *Iterator) SeekSection(cellID s2.CellID) bool {
 		pos = 0
 	}
 	i.cellID = 0
-	i.bufOff = i.index[pos]
-	i.sectionNum = pos
-	return true
+	i.boff = i.index[pos]
+	i.snum = pos
 }
 
-// SeekSection advances the cursor to the cell >= cellID
-func (i *Iterator) Seek(cellID s2.CellID) bool {
-	if !i.SeekSection(cellID) {
-		return false
-	}
+// Seek positions the cursor to the cell >= cellID within the current block.
+func (i *Iterator) Seek(cellID s2.CellID) {
+	i.SeekSection(cellID)
 
-	if i.cellID >= cellID {
-		return true
-	}
-
+	xcell, xsnum, xboff := i.cellID, i.snum, i.boff
 	for i.Next() {
 		if i.cellID >= cellID {
-			return true
+			i.cellID, i.snum, i.boff = xcell, xsnum, xboff
+			return
 		}
+		xcell, xsnum, xboff = i.cellID, i.snum, i.boff
 	}
-	return false
 }
 
 // NextBlock jumps to the next block, returns true if successful.
 func (i *Iterator) NextBlock() bool {
-	return i.advanceBlock(i.blockNum + 1)
+	return i.toBlock(i.bnum + 1)
 }
 
 // PrevBlock jumps to the previous block, returns true if successful.
 func (i *Iterator) PrevBlock() bool {
-	return i.advanceBlock(i.blockNum - 1)
+	return i.toBlock(i.bnum - 1)
 }
 
-func (i *Iterator) advanceBlock(blockNum int) bool {
+func (i *Iterator) fwd(fn func(cellID s2.CellID, bnum, boff int) bool) {
 	if i.err != nil {
-		return false
+		return
 	}
 
-	if blockNum < 0 || blockNum >= len(i.parent.index) {
-		return false
-	}
+	var stop bool
+	for {
+		boff := i.boff
+		for !stop && i.err == nil && i.Next() {
+			stop = !fn(i.CellID(), i.bnum, boff)
+			boff = i.boff
+		}
 
-	j, err := i.parent.readBlock(blockNum)
-	if err != nil {
-		i.err = err
-		return false
+		if stop || i.err != nil || !i.NextBlock() {
+			break
+		}
 	}
-
-	i.Release()
-	*i = *j
-	return true
 }
 
-func (i *Iterator) advanceSection(num int) bool {
-	if num < 0 || num >= len(i.index) {
-		return false
+func (i *Iterator) rev(fn func(cellID s2.CellID, bnum, boff int) bool) {
+	if i.err != nil {
+		return
 	}
 
-	i.cellID = 0
-	i.sectionNum = num
-	i.bufOff = i.index[num]
-	return true
+	var stop bool
+
+	finish := i.boff
+
+	for {
+		for sn := i.snum; !stop && i.err == nil && sn >= 0; sn-- {
+			if !i.toSection(sn) {
+				break
+			}
+
+			if sn+1 < len(i.index) && i.index[sn+1] < finish {
+				finish = i.index[sn+1]
+			}
+
+			boff := i.boff
+			for boff < finish && !stop && i.err == nil && i.Next() {
+				stop = !fn(i.CellID(), i.bnum, boff)
+				boff = i.boff
+			}
+		}
+
+		if stop || i.err != nil || !i.PrevBlock() {
+			break
+		}
+
+		finish = len(i.buf)
+		i.snum = len(i.index) - 1
+	}
 }
 
 // CellID returns the cell ID of the current entry.
@@ -153,4 +172,41 @@ func (i *Iterator) Err() error {
 // Release releases the iterator. It must not be used once this method is called.
 func (i *Iterator) Release() {
 	releaseBuffer(i.buf)
+}
+
+func (i *Iterator) toBlock(bnum int) bool {
+	if i.err != nil {
+		return false
+	}
+
+	if bnum < 0 || bnum >= len(i.parent.index) {
+		return false
+	}
+
+	if bnum == i.bnum {
+		i.cellID = 0
+		i.snum = 0
+		i.boff = 0
+	}
+
+	j, err := i.parent.readBlock(bnum)
+	if err != nil {
+		i.err = err
+		return false
+	}
+
+	i.Release()
+	*i = *j
+	return true
+}
+
+func (i *Iterator) toSection(snum int) bool {
+	if snum < 0 || snum >= len(i.index) {
+		return false
+	}
+
+	i.cellID = 0
+	i.snum = snum
+	i.boff = i.index[snum]
+	return true
 }

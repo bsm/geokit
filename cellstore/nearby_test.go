@@ -27,129 +27,124 @@ var _ = Describe("NearbyIterator", func() {
 		reader = seedReader(100)
 	})
 
-	It("should iterate within a block", func() {
+	It("should iterate", func() {
 		Expect(nearby(1317624576600000281, 3)).To(Equal([]s2.CellID{
 			1317624576600000273,
 			1317624576600000281,
 			1317624576600000289,
 		}))
 		Expect(nearby(1317624576600000281, 4)).To(Equal([]s2.CellID{
+			1317624576600000225, // new addition
 			1317624576600000273,
 			1317624576600000281,
-			1317624576600000289, 1317624576600000305,
+			1317624576600000289,
 		}))
 		Expect(nearby(1317624576600000281, 5)).To(Equal([]s2.CellID{
+			1317624576600000225,
 			1317624576600000273,
 			1317624576600000281,
-			1317624576600000289, 1317624576600000305, 1317624576600000313,
+			1317624576600000289,
+			1317624576600000313, // new addition
 		}))
 		Expect(nearby(1317624576600000281, 6)).To(Equal([]s2.CellID{
-			1317624576600000257, 1317624576600000273,
+			1317624576600000225,
+			1317624576600000273,
 			1317624576600000281,
-			1317624576600000289, 1317624576600000305, 1317624576600000313,
+			1317624576600000289,
+			1317624576600000305,
+			1317624576600000313,
 		}))
-
-		Expect(nearby(1317624576600000321, 7)).To(Equal([]s2.CellID{
-			1317624576600000273, 1317624576600000305, 1317624576600000313,
+		Expect(nearby(1317624576600000281, 7)).To(Equal([]s2.CellID{
+			1317624576600000225,
+			1317624576600000257,
+			1317624576600000273,
+			1317624576600000281,
+			1317624576600000289,
+			1317624576600000305,
+			1317624576600000313,
+		}))
+		Expect(nearby(1317624576600000281, 40)).To(Equal([]s2.CellID{
+			1317624576600000073,
+			1317624576600000081,
+			1317624576600000089,
+			1317624576600000097,
+			1317624576600000137,
+			1317624576600000145,
+			1317624576600000185,
+			1317624576600000193,
+			1317624576600000201,
+			1317624576600000209,
+			1317624576600000217,
+			1317624576600000225,
+			1317624576600000233,
+			1317624576600000241,
+			1317624576600000249,
+			1317624576600000257,
+			1317624576600000265,
+			1317624576600000273,
+			1317624576600000281,
+			1317624576600000289,
+			1317624576600000297,
+			1317624576600000305,
+			1317624576600000313,
 			1317624576600000321,
-			1317624576600000329, 1317624576600000337, 1317624576600000345,
+			1317624576600000329,
+			1317624576600000337,
+			1317624576600000345,
+			1317624576600000353,
+			1317624576600000361,
+			1317624576600000369,
+			1317624576600000377,
+			1317624576600000385,
+			1317624576600000401,
+			1317624576600000409,
+			1317624576600000417,
+			1317624576600000425,
+			1317624576600000433,
+			1317624576600000441,
+			1317624576600000449,
+			1317624576600000457,
 		}))
-
 	})
 
 })
 
-var _ = Describe("nearbySlice", func() {
+var _ = Describe("nearbySlice",
+	func() {
 
-	It("should sort", func() {
-		s := nearbySlice{
-			{CellID: 1317624576600000345},
-			{CellID: 1317624576600000321},
-			{CellID: 1317624576600000305},
-			{CellID: 1317624576600000289},
-			{CellID: 1317624576600000257},
-			{CellID: 1317624576600000249},
-			{CellID: 1317624576600000241},
-		}
+		It("should sort",
+			func() {
+				s := nearbySlice{
+					{CellID: 1317624576600000345},
+					{CellID: 1317624576600000321},
+					{CellID: 1317624576600000305},
+					{CellID: 1317624576600000289},
+					{CellID: 1317624576600000257},
+					{CellID: 1317624576600000249},
+					{CellID: 1317624576600000241},
+				}
 
-		s.SortByDistance(1317624576600000301)
-		Expect(s).To(Equal(nearbySlice{
-			{CellID: 1317624576600000305},
-			{CellID: 1317624576600000289},
-			{CellID: 1317624576600000321},
-			{CellID: 1317624576600000257},
-			{CellID: 1317624576600000241},
-			{CellID: 1317624576600000345},
-			{CellID: 1317624576600000249},
-		}))
+				s.SortByDistance(1317624576600000301)
+				Expect(s).To(Equal(nearbySlice{
+					{CellID: 1317624576600000305},
+					{CellID: 1317624576600000289},
+					{CellID: 1317624576600000321},
+					{CellID: 1317624576600000257},
+					{CellID: 1317624576600000241},
+					{CellID: 1317624576600000345},
+					{CellID: 1317624576600000249},
+				}))
 
-		s.Sort()
-		Expect(s).To(Equal(nearbySlice{
-			{CellID: 1317624576600000241},
-			{CellID: 1317624576600000249},
-			{CellID: 1317624576600000257},
-			{CellID: 1317624576600000289},
-			{CellID: 1317624576600000305},
-			{CellID: 1317624576600000321},
-			{CellID: 1317624576600000345},
-		}))
+				s.Sort()
+				Expect(s).To(Equal(nearbySlice{
+					{CellID: 1317624576600000241},
+					{CellID: 1317624576600000249},
+					{CellID: 1317624576600000257},
+					{CellID: 1317624576600000289},
+					{CellID: 1317624576600000305},
+					{CellID: 1317624576600000321},
+					{CellID: 1317624576600000345},
+				}))
+			})
+
 	})
-
-	It("should PushLeft", func() {
-		s := make(nearbySlice, 0, 3)
-		s = s.PushLeft(nearbyEntry{CellID: 1})
-		Expect(s).To(HaveLen(1))
-		Expect(s).To(HaveCap(3))
-
-		s = s.PushLeft(nearbyEntry{CellID: 3})
-		Expect(s).To(HaveLen(2))
-		Expect(s).To(HaveCap(3))
-
-		s = s.PushLeft(nearbyEntry{CellID: 5})
-		Expect(s).To(HaveLen(3))
-		Expect(s).To(HaveCap(3))
-		Expect(s).To(Equal(nearbySlice{
-			{CellID: 1},
-			{CellID: 3},
-			{CellID: 5},
-		}))
-
-		s = s.PushLeft(nearbyEntry{CellID: 7})
-		Expect(s).To(HaveLen(3))
-		Expect(s).To(HaveCap(3))
-		Expect(s).To(Equal(nearbySlice{
-			{CellID: 3},
-			{CellID: 5},
-			{CellID: 7},
-		}))
-	})
-
-	It("should PushRight", func() {
-		s := make(nearbySlice, 0, 3)
-		s = s.PushRight(nearbyEntry{CellID: 1})
-		Expect(s).To(HaveLen(1))
-		Expect(s).To(HaveCap(3))
-
-		s = s.PushRight(nearbyEntry{CellID: 3})
-		Expect(s).To(HaveLen(2))
-		Expect(s).To(HaveCap(3))
-
-		s = s.PushRight(nearbyEntry{CellID: 5})
-		Expect(s).To(HaveLen(3))
-		Expect(s).To(HaveCap(3))
-		Expect(s).To(Equal(nearbySlice{
-			{CellID: 1},
-			{CellID: 3},
-			{CellID: 5},
-		}))
-
-		s = s.PushRight(nearbyEntry{CellID: 7})
-		Expect(s).To(HaveLen(3))
-		Expect(s).To(HaveCap(3))
-		Expect(s).To(Equal(nearbySlice{
-			{CellID: 1},
-			{CellID: 3},
-			{CellID: 5},
-		}))
-	})
-})

@@ -73,70 +73,55 @@ func (r *Reader) NumBlocks() int {
 	return len(r.index)
 }
 
-func (r *Reader) blockOffset(blockNum int) int64 {
-	if blockNum < len(r.index) {
-		return r.index[blockNum].Offset
-	}
-	return r.indexOffset
-}
-
 // Nearby returns a limited iterator over close to cellID.
 // Please note that the iterator entries are not sorted.
 func (r *Reader) Nearby(origin s2.CellID, limit int) (*NearbyIterator, error) {
-	block, err := r.FindBlock(origin)
+	it, err := r.FindBlock(origin)
 	if err != nil {
 		return nil, err
 	}
+	it.SeekSection(origin)
 
-	block.SeekSection(origin)
-	originalSection := block.sectionNum
-	left, right := fetchNearbySlice(2*limit), fetchNearbySlice(2*limit)
+	bnum, snum := it.bnum, it.snum
+	maxEntries := limit + 6
+	entries := fetchNearbySlice(2 * maxEntries)
 
-	blockOff := block.bufOff
-	for block.Next() {
-		if cellID := block.CellID(); cellID < origin {
-			left = left.PushLeft(nearbyEntry{
+	// perform a forward iteration
+	remaining := maxEntries
+	it.fwd(func(cellID s2.CellID, bnum, boff int) bool {
+		entries = append(entries, nearbyEntry{
+			CellID: cellID,
+			bnum:   bnum,
+			boff:   boff,
+		})
+		remaining--
+		return remaining > 0
+	})
+
+	// perform a reverse iteration
+	if it.Err() == nil && it.toBlock(bnum) && it.toSection(snum) {
+		remaining = maxEntries
+		it.rev(func(cellID s2.CellID, bnum, boff int) bool {
+			entries = append(entries, nearbyEntry{
 				CellID: cellID,
-				num:    block.blockNum,
-				off:    blockOff,
+				bnum:   bnum,
+				boff:   boff,
 			})
-		} else {
-			right = right.PushRight(nearbyEntry{
-				CellID: cellID,
-				num:    block.blockNum,
-				off:    blockOff,
-			})
-		}
-		if len(right) >= limit {
-			break
-		}
-		blockOff = block.bufOff
+			remaining--
+			return remaining > 0
+		})
 	}
 
-	for sn := originalSection - 1; sn >= 0; sn-- {
-		if len(left) >= limit || !block.advanceSection(sn) {
-			break
-		}
-		for block.Next() {
-			if block.sectionNum > sn {
-				break
-			}
-			left = left.PushLeft(nearbyEntry{
-				CellID: block.CellID(),
-				num:    block.blockNum,
-				off:    block.bufOff,
-			})
-		}
+	if err := it.Err(); err != nil {
+		return nil, err
 	}
 
-	entries := append(left, right...)
 	entries.SortByDistance(origin)
 	entries = entries.Limit(limit)
 	entries.Sort()
-	nearbySlicePool.Put(right)
 
 	return &NearbyIterator{
-		block:   block,
+		block:   it,
 		entries: entries,
 		pos:     -1,
 	}, nil
@@ -161,10 +146,10 @@ func (r *Reader) FindBlock(cellID s2.CellID) (*Iterator, error) {
 	return r.readBlock(blockPos)
 }
 
-func (r *Reader) readBlock(blockNum int) (*Iterator, error) {
-	min := r.index[blockNum].Offset
+func (r *Reader) readBlock(bnum int) (*Iterator, error) {
+	min := r.index[bnum].Offset
 	max := r.indexOffset
-	if next := blockNum + 1; next < len(r.index) {
+	if next := bnum + 1; next < len(r.index) {
 		max = r.index[next].Offset
 	}
 
@@ -200,15 +185,16 @@ func (r *Reader) readBlock(blockNum int) (*Iterator, error) {
 
 	numSections := int(binary.LittleEndian.Uint32(buf[len(buf)-4:]))
 	indexOffset := len(buf) - numSections*4
+
 	index := append(make([]int, 0, numSections), 0)
 	for n := indexOffset; n < len(buf)-4; n += 4 {
 		index = append(index, int(binary.LittleEndian.Uint32(buf[n:])))
 	}
 
 	return &Iterator{
-		parent:   r,
-		blockNum: blockNum,
-		index:    index,
-		buf:      buf[:indexOffset],
+		parent: r,
+		bnum:   bnum,
+		index:  index,
+		buf:    buf[:indexOffset],
 	}, nil
 }
