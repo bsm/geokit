@@ -143,6 +143,7 @@ func (r *Reader) FindBlock(cellID s2.CellID) (*Iterator, error) {
 	if blockPos >= len(r.index) {
 		return &Iterator{parent: r}, nil
 	}
+
 	return r.readBlock(blockPos)
 }
 

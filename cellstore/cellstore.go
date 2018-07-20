@@ -85,7 +85,7 @@ func fetchBuffer(sz int) []byte {
 }
 
 func releaseBuffer(p []byte) {
-	if len(p) != 0 {
+	if cap(p) != 0 {
 		bufPool.Put(p)
 	}
 }

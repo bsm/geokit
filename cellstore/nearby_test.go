@@ -207,6 +207,7 @@ func BenchmarkReader_Nearby(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			cellID := seedCellID + s2.CellID((i%numRecords)*8)
+
 			it, err := r.Nearby(cellID, limit)
 			if err != nil {
 				b.Fatalf("error finding nearby %d: %v", cellID, err)
@@ -221,16 +222,16 @@ func BenchmarkReader_Nearby(b *testing.B) {
 		}
 	}
 
-	b.Run("1k, limit=3", func(b *testing.B) {
+	b.Run("1k limit=3", func(b *testing.B) {
 		runBench(b, 1000, 3)
 	})
-	b.Run("1k, limit=100", func(b *testing.B) {
+	b.Run("1k limit=100", func(b *testing.B) {
 		runBench(b, 1000, 100)
 	})
-	b.Run("10M, limit=3", func(b *testing.B) {
-		runBench(b, 10*1000*1000, 3)
+	b.Run("1M limit=3", func(b *testing.B) {
+		runBench(b, 1*1000*1000, 3)
 	})
-	b.Run("10M, limit=100", func(b *testing.B) {
-		runBench(b, 10*1000*1000, 100)
+	b.Run("1M limit=100", func(b *testing.B) {
+		runBench(b, 1*1000*1000, 100)
 	})
 }
