@@ -12,7 +12,6 @@ import (
 var _ = Describe("Writer", func() {
 	var buf *bytes.Buffer
 	var subject *Writer
-	var cellID = s2.CellID(1317624576600000001)
 
 	BeforeEach(func() {
 		buf = new(bytes.Buffer)
@@ -29,15 +28,15 @@ var _ = Describe("Writer", func() {
 	})
 
 	It("should prevent out-of-order writes", func() {
-		Expect(subject.Append(cellID, []byte("testdata"))).To(Succeed())
-		Expect(subject.Append(cellID, []byte("testdata"))).To(MatchError(`cellstore: attempted an out-of-order append, 0/210210210210210201302022030000 must be > 0/210210210210210201302022030000`))
-		Expect(subject.Append(cellID-2, []byte("testdata"))).To(MatchError(`cellstore: attempted an out-of-order append, 0/210210210210210201302022023333 must be > 0/210210210210210201302022030000`))
-		Expect(subject.Append(cellID+2, []byte("testdata"))).To(Succeed())
+		Expect(subject.Append(seedCellID, []byte("testdata"))).To(Succeed())
+		Expect(subject.Append(seedCellID, []byte("testdata"))).To(MatchError(`cellstore: attempted an out-of-order append, 0/210210210210210201302022030000 must be > 0/210210210210210201302022030000`))
+		Expect(subject.Append(seedCellID-2, []byte("testdata"))).To(MatchError(`cellstore: attempted an out-of-order append, 0/210210210210210201302022023333 must be > 0/210210210210210201302022030000`))
+		Expect(subject.Append(seedCellID+2, []byte("testdata"))).To(Succeed())
 	})
 
 	It("should prevent invalid writes", func() {
-		Expect(subject.Append(cellID-1, []byte("testdata"))).To(MatchError(errInvalidCellID))
-		Expect(subject.Append(cellID+1, []byte("testdata"))).To(MatchError(errInvalidCellID))
+		Expect(subject.Append(seedCellID-1, []byte("testdata"))).To(MatchError(errInvalidCellID))
+		Expect(subject.Append(seedCellID+1, []byte("testdata"))).To(MatchError(errInvalidCellID))
 	})
 
 	It("should write (non-compressable)", func() {
@@ -47,7 +46,7 @@ var _ = Describe("Writer", func() {
 		for i := 0; i < 100000; i += 2 {
 			_, err := rnd.Read(val)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(subject.Append(cellID+s2.CellID(i), val)).To(Succeed())
+			Expect(subject.Append(seedCellID+s2.CellID(i), val)).To(Succeed())
 		}
 		Expect(subject.Close()).To(Succeed())
 		Expect(len(subject.index)).To(Equal(404))
@@ -58,7 +57,7 @@ var _ = Describe("Writer", func() {
 	It("should write (well-compressable)", func() {
 		val := bytes.Repeat([]byte("testdata"), 16)
 		for i := 0; i < 100000; i += 2 {
-			Expect(subject.Append(cellID+s2.CellID(i), val)).To(Succeed())
+			Expect(subject.Append(seedCellID+s2.CellID(i), val)).To(Succeed())
 		}
 		Expect(subject.Close()).To(Succeed())
 		Expect(len(subject.index)).To(Equal(404))

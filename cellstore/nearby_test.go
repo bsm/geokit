@@ -1,6 +1,9 @@
 package cellstore
 
 import (
+	"os"
+	"testing"
+
 	"github.com/golang/geo/s2"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -149,42 +152,85 @@ var _ = Describe("NearbyIterator", func() {
 
 })
 
-var _ = Describe("nearbySlice",
-	func() {
+var _ = Describe("nearbySlice", func() {
 
-		It("should sort",
-			func() {
-				s := nearbySlice{
-					{CellID: 1317624576600000345},
-					{CellID: 1317624576600000321},
-					{CellID: 1317624576600000305},
-					{CellID: 1317624576600000289},
-					{CellID: 1317624576600000257},
-					{CellID: 1317624576600000249},
-					{CellID: 1317624576600000241},
-				}
+	It("should sort",
+		func() {
+			s := nearbySlice{
+				{CellID: 1317624576600000345},
+				{CellID: 1317624576600000321},
+				{CellID: 1317624576600000305},
+				{CellID: 1317624576600000289},
+				{CellID: 1317624576600000257},
+				{CellID: 1317624576600000249},
+				{CellID: 1317624576600000241},
+			}
 
-				s.SortByDistance(1317624576600000301)
-				Expect(s).To(Equal(nearbySlice{
-					{CellID: 1317624576600000305},
-					{CellID: 1317624576600000289},
-					{CellID: 1317624576600000321},
-					{CellID: 1317624576600000257},
-					{CellID: 1317624576600000241},
-					{CellID: 1317624576600000345},
-					{CellID: 1317624576600000249},
-				}))
+			s.SortByDistance(1317624576600000301)
+			Expect(s).To(Equal(nearbySlice{
+				{CellID: 1317624576600000305},
+				{CellID: 1317624576600000289},
+				{CellID: 1317624576600000321},
+				{CellID: 1317624576600000257},
+				{CellID: 1317624576600000241},
+				{CellID: 1317624576600000345},
+				{CellID: 1317624576600000249},
+			}))
 
-				s.Sort()
-				Expect(s).To(Equal(nearbySlice{
-					{CellID: 1317624576600000241},
-					{CellID: 1317624576600000249},
-					{CellID: 1317624576600000257},
-					{CellID: 1317624576600000289},
-					{CellID: 1317624576600000305},
-					{CellID: 1317624576600000321},
-					{CellID: 1317624576600000345},
-				}))
-			})
+			s.Sort()
+			Expect(s).To(Equal(nearbySlice{
+				{CellID: 1317624576600000241},
+				{CellID: 1317624576600000249},
+				{CellID: 1317624576600000257},
+				{CellID: 1317624576600000289},
+				{CellID: 1317624576600000305},
+				{CellID: 1317624576600000321},
+				{CellID: 1317624576600000345},
+			}))
+		})
 
+})
+
+// --------------------------------------------------------------------
+
+// --------------------------------------------------------------------
+
+func BenchmarkReader_Nearby(b *testing.B) {
+	runBench := func(b *testing.B, numRecords int, limit int) {
+		r, f, err := seedReaderOnDisk(numRecords, NoCompression)
+		if err != nil {
+			b.Fatal(err)
+		}
+		defer os.Remove(f.Name())
+		defer f.Close()
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			cellID := seedCellID + s2.CellID((i%numRecords)*8)
+			it, err := r.Nearby(cellID, limit)
+			if err != nil {
+				b.Fatalf("error finding nearby %d: %v", cellID, err)
+			}
+			if !it.Next() {
+				b.Fatalf("unable to advance cursor on %d", cellID)
+			}
+			if err := it.Err(); err != nil {
+				b.Fatalf("error iterating over block containing cell %d: %v", cellID, err)
+			}
+			it.Release()
+		}
+	}
+
+	b.Run("1k, limit=3", func(b *testing.B) {
+		runBench(b, 1000, 3)
 	})
+	b.Run("1k, limit=100", func(b *testing.B) {
+		runBench(b, 1000, 100)
+	})
+	b.Run("10M, limit=3", func(b *testing.B) {
+		runBench(b, 10*1000*1000, 3)
+	})
+	b.Run("10M, limit=100", func(b *testing.B) {
+		runBench(b, 10*1000*1000, 100)
+	})
+}
