@@ -15,7 +15,8 @@ type Writer struct {
 	o Options
 
 	block blockInfo // the current block info
-	blen  int       // the number of block entries
+	blen  int       // the number of entries in the current block
+	soffs []int     // section offsets in the current block
 
 	buf []byte // plain buffer
 	snp []byte // snappy  buffer
@@ -56,12 +57,14 @@ func (w *Writer) Append(cellID s2.CellID, data []byte) error {
 		}
 	}
 
-	inc := cellID
-	if len(w.buf) != 0 { // delta-encode CellID
-		inc -= w.block.MaxCellID
+	key := cellID
+	if w.blen%w.o.SectionSize == 0 { // new section?
+		w.soffs = append(w.soffs, len(w.buf))
+	} else {
+		key -= w.block.MaxCellID // apply delta-encoding
 	}
 
-	n := binary.PutUvarint(w.tmp[0:], uint64(inc))
+	n := binary.PutUvarint(w.tmp[0:], uint64(key))
 	n += binary.PutUvarint(w.tmp[n:], uint64(len(data)))
 	w.buf = append(w.buf, w.tmp[:n]...)
 	w.buf = append(w.buf, data...)
@@ -137,14 +140,20 @@ func (w *Writer) flush() error {
 		return nil
 	}
 
-	binary.LittleEndian.PutUint32(w.tmp, uint32(w.blen))
+	for _, o := range w.soffs {
+		if o > 0 {
+			binary.LittleEndian.PutUint32(w.tmp, uint32(o))
+			w.buf = append(w.buf, w.tmp[:4]...)
+		}
+	}
+	binary.LittleEndian.PutUint32(w.tmp, uint32(len(w.soffs)))
 	w.buf = append(w.buf, w.tmp[:4]...)
 
 	var block []byte
 	switch w.o.Compression {
 	case SnappyCompression:
 		w.snp = snappy.Encode(w.snp[:cap(w.snp)], w.buf)
-		if len(w.snp) < len(w.buf)-len(w.buf)/8 {
+		if len(w.snp) < len(w.buf)-len(w.buf)/4 {
 			block = append(w.snp, blockSnappyCompression)
 		} else {
 			block = append(w.buf, blockNoCompression)
@@ -155,6 +164,7 @@ func (w *Writer) flush() error {
 
 	w.index = append(w.index, w.block)
 	w.buf = w.buf[:0]
+	w.soffs = w.soffs[:0]
 	w.blen = 0
 
 	return w.writeRaw(block)

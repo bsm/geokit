@@ -42,8 +42,11 @@ const (
 )
 
 type Options struct {
-	// The size of a block. Must be >= 1KiB. Default: 8KiB.
+	// The size of a block. Must be >= 1KiB. Default: 16KiB.
 	BlockSize int
+
+	// The maximum number of entries per section. Must be > 0. Default: 16.
+	SectionSize int
 
 	// The compression algorithm to use. Default: SnappyCompression.
 	Compression Compression
@@ -51,7 +54,10 @@ type Options struct {
 
 func (o *Options) norm() {
 	if o.BlockSize < 1 {
-		o.BlockSize = 8 * KiB
+		o.BlockSize = 16 * KiB
+	}
+	if o.SectionSize < 1 {
+		o.SectionSize = 16
 	}
 	if !o.Compression.isValid() {
 		o.Compression = SnappyCompression
@@ -79,7 +85,7 @@ func fetchBuffer(sz int) []byte {
 }
 
 func releaseBuffer(p []byte) {
-	if len(p) != 0 {
+	if cap(p) != 0 {
 		bufPool.Put(p)
 	}
 }

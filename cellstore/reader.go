@@ -73,11 +73,58 @@ func (r *Reader) NumBlocks() int {
 	return len(r.index)
 }
 
-func (r *Reader) blockOffset(blockNo int) int64 {
-	if blockNo < len(r.index) {
-		return r.index[blockNo].Offset
+// Nearby returns a limited iterator over close to cellID.
+// Please note that the iterator entries are not sorted.
+func (r *Reader) Nearby(origin s2.CellID, limit int) (*NearbyIterator, error) {
+	it, err := r.FindBlock(origin)
+	if err != nil {
+		return nil, err
 	}
-	return r.indexOffset
+	it.SeekSection(origin)
+
+	bnum, snum := it.bnum, it.snum
+	maxEntries := limit + 4
+	entries := fetchNearbySlice(2 * maxEntries)
+
+	// perform a forward iteration
+	remaining := maxEntries
+	it.fwd(func(cellID s2.CellID, bnum, boff int) bool {
+		entries = append(entries, nearbyEntry{
+			CellID: cellID,
+			bnum:   bnum,
+			boff:   boff,
+		})
+		remaining--
+		return remaining > 0
+	})
+
+	// perform a reverse iteration
+	if it.Err() == nil && it.toBlock(bnum) && it.toSection(snum) {
+		remaining = maxEntries
+		it.rev(func(cellID s2.CellID, bnum, boff int) bool {
+			entries = append(entries, nearbyEntry{
+				CellID: cellID,
+				bnum:   bnum,
+				boff:   boff,
+			})
+			remaining--
+			return remaining > 0
+		})
+	}
+
+	if err := it.Err(); err != nil {
+		return nil, err
+	}
+
+	entries.SortByDistance(origin)
+	entries = entries.Limit(limit)
+	entries.Sort()
+
+	return &NearbyIterator{
+		block:   it,
+		entries: entries,
+		pos:     -1,
+	}, nil
 }
 
 // FindBlock returns the block which is closest to the given cellID.
@@ -96,13 +143,14 @@ func (r *Reader) FindBlock(cellID s2.CellID) (*Iterator, error) {
 	if blockPos >= len(r.index) {
 		return &Iterator{parent: r}, nil
 	}
+
 	return r.readBlock(blockPos)
 }
 
-func (r *Reader) readBlock(blockNo int) (*Iterator, error) {
-	min := r.index[blockNo].Offset
+func (r *Reader) readBlock(bnum int) (*Iterator, error) {
+	min := r.index[bnum].Offset
 	max := r.indexOffset
-	if next := blockNo + 1; next < len(r.index) {
+	if next := bnum + 1; next < len(r.index) {
 		max = r.index[next].Offset
 	}
 
@@ -136,130 +184,18 @@ func (r *Reader) readBlock(blockNo int) (*Iterator, error) {
 		return nil, errInvalidCompression
 	}
 
-	eoi := len(buf) - 4
-	numEntries := int(binary.LittleEndian.Uint32(buf[eoi:]))
+	numSections := int(binary.LittleEndian.Uint32(buf[len(buf)-4:]))
+	indexOffset := len(buf) - numSections*4
+
+	index := append(make([]int, 0, numSections), 0)
+	for n := indexOffset; n < len(buf)-4; n += 4 {
+		index = append(index, int(binary.LittleEndian.Uint32(buf[n:])))
+	}
+
 	return &Iterator{
-		parent:     r,
-		blockNo:    blockNo,
-		numEntries: numEntries,
-		blockBuf:   buf[:eoi],
-		entryPos:   -1,
+		parent: r,
+		bnum:   bnum,
+		index:  index,
+		buf:    buf[:indexOffset],
 	}, nil
-}
-
-// --------------------------------------------------------------------
-
-type Iterator struct {
-	parent     *Reader
-	blockNo    int // block number
-	numEntries int // total number of entries
-	blockBuf   []byte
-
-	cursor   int // buffer cursor position
-	entryPos int // current entry position
-
-	cellID s2.CellID
-	value  []byte
-	err    error
-}
-
-// Next advances the cursor to the next entry
-func (i *Iterator) Next() bool {
-	if i.err != nil {
-		return false
-	}
-
-	// read CellID
-	if i.cursor+1 > len(i.blockBuf) {
-		return false
-	}
-	key, n := binary.Uvarint(i.blockBuf[i.cursor:])
-	i.cellID += s2.CellID(key)
-	i.cursor += n
-
-	// read value length
-	if i.cursor+1 > len(i.blockBuf) {
-		return false
-	}
-	vln, n := binary.Uvarint(i.blockBuf[i.cursor:])
-	i.cursor += n
-
-	// read value
-	if i.cursor+int(vln) > len(i.blockBuf) {
-		return false
-	}
-	i.value = i.blockBuf[i.cursor : i.cursor+int(vln)]
-	i.cursor += int(vln)
-	i.entryPos++
-
-	return true
-}
-
-// Seek advances the cursor to the entry with CellID >= the given value.
-func (i *Iterator) Seek(cellID s2.CellID) bool {
-	if cellID >= i.cellID {
-		for i.Next() {
-			if i.cellID >= cellID {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// NextBlock jumps to the next block, returns true if successful.
-func (i *Iterator) NextBlock() bool {
-	return i.advance(i.blockNo + 1)
-}
-
-// PrevBlock jumps to the previous block, returns true if successful.
-func (i *Iterator) PrevBlock() bool {
-	return i.advance(i.blockNo - 1)
-}
-
-func (i *Iterator) advance(blockNo int) bool {
-	if i.err != nil {
-		return false
-	}
-
-	if blockNo < 0 || blockNo >= len(i.parent.index) {
-		return false
-	}
-
-	j, err := i.parent.readBlock(blockNo)
-	if err != nil {
-		i.err = err
-		return false
-	}
-
-	i.Release()
-	*i = *j
-	return true
-}
-
-// CellID returns the cell ID of the current entry.
-func (i *Iterator) CellID() s2.CellID {
-	return i.cellID
-}
-
-// Value returns the value of the current entry. Please note that values
-// are temporary buffers and must be copied if used beyond the next Next() or
-// Release() function call.
-func (i *Iterator) Value() []byte {
-	return i.value
-}
-
-// Len returns the number of entries in the current block.
-func (i *Iterator) Len() int {
-	return i.numEntries
-}
-
-// Err returns iterator errors
-func (i *Iterator) Err() error {
-	return i.err
-}
-
-// Release releases the iterator. It must not be used once this method is called.
-func (i *Iterator) Release() {
-	releaseBuffer(i.blockBuf)
 }
