@@ -125,7 +125,6 @@ func (i *Iterator) rev(fn func(cellID s2.CellID, bnum, boff int) bool) {
 	var stop bool
 
 	finish := i.boff
-
 	for {
 		for sn := i.snum; !stop && i.err == nil && sn >= 0; sn-- {
 			if !i.toSection(sn) {
@@ -172,6 +171,20 @@ func (i *Iterator) Err() error {
 // Release releases the iterator. It must not be used once this method is called.
 func (i *Iterator) Release() {
 	releaseBuffer(i.buf)
+}
+
+func (i *Iterator) setOffset(boff int) {
+	if i.boff == boff {
+		return
+	}
+
+	if boff < len(i.buf) {
+		i.boff = boff
+	}
+	i.snum = sort.Search(len(i.index), func(n int) bool {
+		return i.index[n] > boff
+	}) - 1
+
 }
 
 func (i *Iterator) toBlock(bnum int) bool {

@@ -31,6 +31,16 @@ var _ = Describe("Iterator", func() {
 	})
 
 	It("should iterate blocks", func() {
+		Expect(subject.Next()).To(BeTrue())
+		Expect(subject.CellID()).To(Equal(s2.CellID(1317624576600000241)))
+		Expect(string(subject.Value())).To(ContainSubstring(subject.CellID().String()))
+
+		Expect(subject.Next()).To(BeTrue())
+		Expect(subject.CellID()).To(Equal(s2.CellID(1317624576600000249)))
+		Expect(string(subject.Value())).To(ContainSubstring(subject.CellID().String()))
+	})
+
+	It("should iterate blocks", func() {
 		Expect(subject.NextBlock()).To(BeTrue())
 		Expect(subject.Next()).To(BeTrue())
 		Expect(subject.CellID()).To(Equal(s2.CellID(1317624576600000361)))

@@ -11,15 +11,21 @@ import (
 type NearbyIterator struct {
 	block   *Iterator
 	entries []nearbyEntry
-	pos     int
+
+	pos int
 }
 
 // Next advances the cursor to the next entry
 // TODO: implement properly
 func (i *NearbyIterator) Next() bool {
-	if i.pos+1 < len(i.entries) {
-		i.pos++
-		return true
+	if np := i.pos + 1; np < len(i.entries) {
+		ent := i.entries[np]
+		if ent.bnum != i.block.bnum && !i.block.toBlock(ent.bnum) {
+			return false
+		}
+		i.pos = np
+		i.block.setOffset(ent.boff)
+		return i.block.Next()
 	}
 	return false
 }
@@ -32,6 +38,11 @@ func (i *NearbyIterator) CellID() s2.CellID {
 	return 0
 }
 
+// Value returns the value at the current cursor position.
+func (i *NearbyIterator) Value() []byte {
+	return i.block.Value()
+}
+
 // Release releases the iterator.
 func (i *NearbyIterator) Release() {
 	releaseNearbySlice(i.entries)
@@ -40,7 +51,7 @@ func (i *NearbyIterator) Release() {
 // Err returns any errors from the iteration.
 // TODO: implement properly
 func (i *NearbyIterator) Err() error {
-	return nil
+	return i.block.Err()
 }
 
 // --------------------------------------------------------------------

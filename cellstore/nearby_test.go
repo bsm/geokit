@@ -9,8 +9,8 @@ import (
 var _ = Describe("NearbyIterator", func() {
 	var reader *Reader
 
-	nearby := func(target s2.CellID, limit int) ([]s2.CellID, error) {
-		it, err := reader.Nearby(target, limit)
+	nearby := func(limit int) ([]s2.CellID, error) {
+		it, err := reader.Nearby(1317624576600000281, limit)
 		if err != nil {
 			return nil, err
 		}
@@ -28,42 +28,82 @@ var _ = Describe("NearbyIterator", func() {
 	})
 
 	It("should iterate", func() {
-		Expect(nearby(1317624576600000281, 3)).To(Equal([]s2.CellID{
+		it, err := reader.Nearby(1317624576600000281, 20)
+		Expect(err).NotTo(HaveOccurred())
+		defer it.Release()
+
+		Expect(it.Next()).To(BeTrue())
+		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000209)))
+		Expect(string(it.Value())).To(ContainSubstring(it.CellID().String()))
+
+		for i := 0; i < 6; i++ {
+			Expect(it.Next()).To(BeTrue())
+		}
+		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000257)))
+		Expect(string(it.Value())).To(ContainSubstring(it.CellID().String()))
+
+		for i := 0; i < 6; i++ {
+			Expect(it.Next()).To(BeTrue())
+		}
+		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000305)))
+		Expect(string(it.Value())).To(ContainSubstring(it.CellID().String()))
+
+		for i := 0; i < 6; i++ {
+			Expect(it.Next()).To(BeTrue())
+		}
+		Expect(it.CellID()).To(Equal(s2.CellID(1317624576600000417)))
+		Expect(string(it.Value())).To(ContainSubstring(it.CellID().String()))
+	})
+
+	It("should sort and limit", func() {
+		Expect(nearby(3)).To(Equal([]s2.CellID{
 			1317624576600000273,
 			1317624576600000281,
 			1317624576600000289,
 		}))
-		Expect(nearby(1317624576600000281, 4)).To(Equal([]s2.CellID{
+		Expect(nearby(4)).To(Equal([]s2.CellID{
 			1317624576600000225, // new addition
 			1317624576600000273,
 			1317624576600000281,
 			1317624576600000289,
 		}))
-		Expect(nearby(1317624576600000281, 5)).To(Equal([]s2.CellID{
+		Expect(nearby(5)).To(Equal([]s2.CellID{
 			1317624576600000225,
 			1317624576600000273,
 			1317624576600000281,
 			1317624576600000289,
 			1317624576600000313, // new addition
 		}))
-		Expect(nearby(1317624576600000281, 6)).To(Equal([]s2.CellID{
+		Expect(nearby(6)).To(Equal([]s2.CellID{
 			1317624576600000225,
+			1317624576600000273,
+			1317624576600000281,
+			1317624576600000289,
+			1317624576600000305, // new addition
+			1317624576600000313,
+		}))
+		Expect(nearby(7)).To(Equal([]s2.CellID{
+			1317624576600000225,
+			1317624576600000257, // new addition
 			1317624576600000273,
 			1317624576600000281,
 			1317624576600000289,
 			1317624576600000305,
 			1317624576600000313,
 		}))
-		Expect(nearby(1317624576600000281, 7)).To(Equal([]s2.CellID{
+		Expect(nearby(10)).To(Equal([]s2.CellID{
+			1317624576600000217, // new addition
 			1317624576600000225,
 			1317624576600000257,
+			1317624576600000265, // new addition
 			1317624576600000273,
 			1317624576600000281,
 			1317624576600000289,
+			1317624576600000297, // new addition
 			1317624576600000305,
 			1317624576600000313,
 		}))
-		Expect(nearby(1317624576600000281, 40)).To(Equal([]s2.CellID{
+		Expect(nearby(40)).To(Equal([]s2.CellID{
 			1317624576600000073,
 			1317624576600000081,
 			1317624576600000089,

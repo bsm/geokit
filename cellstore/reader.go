@@ -83,7 +83,7 @@ func (r *Reader) Nearby(origin s2.CellID, limit int) (*NearbyIterator, error) {
 	it.SeekSection(origin)
 
 	bnum, snum := it.bnum, it.snum
-	maxEntries := limit + 6
+	maxEntries := limit + 4
 	entries := fetchNearbySlice(2 * maxEntries)
 
 	// perform a forward iteration

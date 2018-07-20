@@ -103,7 +103,9 @@ func seedReader(n int) *Reader {
 		_, err := rnd.Read(val)
 		Expect(err).NotTo(HaveOccurred())
 
-		Expect(w.Append(min+s2.CellID(i), val)).To(Succeed())
+		cellID := min + s2.CellID(i)
+		copy(val, cellID.String())
+		Expect(w.Append(cellID, val)).To(Succeed())
 	}
 	Expect(w.Close()).To(Succeed())
 
