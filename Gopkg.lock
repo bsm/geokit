@@ -2,35 +2,16 @@
 
 
 [[projects]]
-  digest = "1:578fc4098a37e04fd357d2172eb1ed8922274f409b5d9d1eda77c45ab7b92180"
-  name = "github.com/bsm/histogram"
-  packages = ["."]
-  pruneopts = ""
-  revision = "253b217b3ad255d48994a6f74de4f82650f5e70d"
-  version = "v2.0.0"
-
-[[projects]]
-  digest = "1:c9857a70700dce587411a66d7a8511924dc8f90ab677d58001cc82b5f8610b71"
-  name = "github.com/bsm/instruments"
-  packages = [
-    ".",
-    "datadog",
-  ]
-  pruneopts = ""
-  revision = "444d5a234ec8a4d2037e81848006510363a7fdb4"
-  version = "v1.3.3"
-
-[[projects]]
   branch = "master"
-  digest = "1:f07299fc0c8192ac69700f7ff37da190a5aac5941a181b7f9cb235a09feb0b36"
+  digest = "1:6dee8424ab6f1b8e0ee3488a6796b0e7b89579b932e420c1c01c5a1c20f748d8"
   name = "github.com/glaslos/go-osm"
   packages = ["."]
-  pruneopts = ""
+  pruneopts = "UT"
   revision = "16aac61485844b864df8696fc9365e732291b664"
 
 [[projects]]
   branch = "master"
-  digest = "1:d67c51f9bda7f3d937e4c06572a37ac9bee042739e759fd0dbabcd73f1334a47"
+  digest = "1:ca7e30de06a78980af00a12b0a9d80736cea5c7f4186275c473a334ece008a84"
   name = "github.com/golang/geo"
   packages = [
     "r1",
@@ -39,31 +20,45 @@
     "s1",
     "s2",
   ]
-  pruneopts = ""
+  pruneopts = "UT"
   revision = "e41ca803f92c4c1770133cfa5b4fc8249a7dbe82"
 
 [[projects]]
   branch = "master"
-  digest = "1:27e28da060cfeac04eb782237922535d76d25783a781610d70bcacc453e2c5a4"
+  digest = "1:063e2b489ba10d13db0838d6ccf0cefa512fed162bb8339d386fb1000515dfe4"
   name = "github.com/golang/leveldb"
   packages = [
     "crc",
     "db",
     "table",
   ]
-  pruneopts = ""
+  pruneopts = "UT"
   revision = "259d9253d71996b7778a3efb4144fe4892342b18"
 
 [[projects]]
   branch = "master"
-  digest = "1:075128b9fc42e6d99067da1a2e6c0a634a6043b5a60abe6909c51f5ecad37b6d"
+  digest = "1:4a0c6bb4805508a6287675fac876be2ac1182539ca8a32468d8128882e9d5009"
   name = "github.com/golang/snappy"
   packages = ["."]
-  pruneopts = ""
+  pruneopts = "UT"
   revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
 
 [[projects]]
-  digest = "1:f16e7314ccb018314c5b7137c5df380d7b24cf5d2fa2b03a7631dd374edb132c"
+  branch = "master"
+  digest = "1:57ba20adfa43f47872d3577fb6e88dd54472ad19f79f95b1975ed87bfe028c45"
+  name = "github.com/hpcloud/tail"
+  packages = [
+    ".",
+    "ratelimiter",
+    "util",
+    "watch",
+    "winfile",
+  ]
+  pruneopts = "UT"
+  revision = "a1dbeea552b7c8df4b542c66073e393de198a800"
+
+[[projects]]
+  digest = "1:dd08739fb80303ce81cb18d63b5c01d563791d9462a5dde7f5da7c3e5ad92605"
   name = "github.com/onsi/ginkgo"
   packages = [
     ".",
@@ -86,12 +81,12 @@
     "reporters/stenographer/support/go-isatty",
     "types",
   ]
-  pruneopts = ""
-  revision = "fa5fabab2a1bfbd924faf4c067d07ae414e2aedf"
-  version = "v1.5.0"
+  pruneopts = "UT"
+  revision = "3774a09d95489ccaa16032e0770d08ea77ba6184"
+  version = "v1.6.0"
 
 [[projects]]
-  digest = "1:19250fabb359eb8c781e45fd7734218e66b016977476a98d63e22a0280db346a"
+  digest = "1:c4a34ca1d26b1d08ba9199b3c187f9c0b090042b7bdb4e5bf9ad76078a3593ac"
   name = "github.com/onsi/gomega"
   packages = [
     ".",
@@ -107,13 +102,13 @@
     "matchers/support/goraph/util",
     "types",
   ]
-  pruneopts = ""
-  revision = "62bff4df71bdbc266561a0caee19f0594b17c240"
-  version = "v1.4.0"
+  pruneopts = "UT"
+  revision = "b6ea1ea48f981d0f615a154a45eabb9dd466556d"
+  version = "v1.4.1"
 
 [[projects]]
   branch = "master"
-  digest = "1:40b88aa81c5c32cdfac0680bd9eb42f9a43e6768acf102f700d652776c3da548"
+  digest = "1:922191411ad8f61bcd8018ac127589bb489712c1d1a0ab2497aca4b16de417d2"
   name = "github.com/syndtr/goleveldb"
   packages = [
     "leveldb",
@@ -129,31 +124,31 @@
     "leveldb/table",
     "leveldb/util",
   ]
-  pruneopts = ""
+  pruneopts = "UT"
   revision = "c4c61651e9e37fa117f53c5a906d3b63090d8445"
 
 [[projects]]
   branch = "master"
-  digest = "1:49cff339ec8c74ee64add028979e4ddabe9e3cb76d072372c2b046cb154ba982"
+  digest = "1:6bab46a020b433450836f84254204364dbce7da8fd944a8c2c40e294b4160826"
   name = "golang.org/x/net"
   packages = [
     "html",
     "html/atom",
     "html/charset",
   ]
-  pruneopts = ""
-  revision = "cffdcf672aee934982473246bc7e9a8ba446aa9b"
+  pruneopts = "UT"
+  revision = "a680a1efc54dd51c040b3b5ce4939ea3cf2ea0d1"
 
 [[projects]]
   branch = "master"
-  digest = "1:880f5ae3ffdd8741fe179f0f70b46df57fcdd746f3a0e9d0e189bb6a241535e4"
+  digest = "1:d773e525476aefa22ea944a5425a9bfb99819b2e67eeb9b1966454fd57522bbf"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  pruneopts = ""
-  revision = "1b2967e3c290b7c545b3db0deeda16e9be4f98a2"
+  pruneopts = "UT"
+  revision = "ac767d655b305d4e9612f5f6e33120b9176c4ad4"
 
 [[projects]]
-  digest = "1:af9bfca4298ef7502c52b1459df274eed401a4f5498b900e9a92d28d3d87ac5a"
+  digest = "1:00b52d21f87065cee85096f07ba40957cc53719145c224da5f5d113669868213"
   name = "golang.org/x/text"
   packages = [
     "encoding",
@@ -174,15 +169,30 @@
     "transform",
     "unicode/cldr",
   ]
-  pruneopts = ""
+  pruneopts = "UT"
   revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
   version = "v0.3.0"
 
 [[projects]]
-  digest = "1:f0620375dd1f6251d9973b5f2596228cc8042e887cd7f827e4220bc1ce8c30e2"
+  digest = "1:abeb38ade3f32a92943e5be54f55ed6d6e3b6602761d74b4aab4c9dd45c18abd"
+  name = "gopkg.in/fsnotify/fsnotify.v1"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9"
+  version = "v1.4.7"
+
+[[projects]]
+  digest = "1:3c839a777de0e6da035c9de900b60cbec463b0a89351192c1ea083eaf9e0fce0"
+  name = "gopkg.in/tomb.v1"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "c131134a1947e9afd9cecfe11f4c6dff0732ae58"
+
+[[projects]]
+  digest = "1:342378ac4dcb378a5448dd723f0784ae519383532f5e70ade24132c4c8693202"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
-  pruneopts = ""
+  pruneopts = "UT"
   revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
   version = "v2.2.1"
 
@@ -190,7 +200,6 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/bsm/instruments/datadog",
     "github.com/glaslos/go-osm",
     "github.com/golang/geo/r3",
     "github.com/golang/geo/s2",

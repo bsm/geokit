@@ -10,7 +10,7 @@ import (
 // NearbyIterator iterates across entries nearby.
 type NearbyIterator struct {
 	block   *Iterator
-	entries []nearbyEntry
+	entries nearbySlice
 
 	pos int
 }
@@ -46,10 +46,10 @@ func (i *NearbyIterator) Value() []byte {
 // Release releases the iterator.
 func (i *NearbyIterator) Release() {
 	releaseNearbySlice(i.entries)
+	i.block.Release()
 }
 
 // Err returns any errors from the iteration.
-// TODO: implement properly
 func (i *NearbyIterator) Err() error {
 	return i.block.Err()
 }
