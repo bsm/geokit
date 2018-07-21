@@ -193,8 +193,6 @@ var _ = Describe("nearbySlice", func() {
 
 // --------------------------------------------------------------------
 
-// --------------------------------------------------------------------
-
 func BenchmarkReader_Nearby(b *testing.B) {
 	runBench := func(b *testing.B, numRecords int, limit int) {
 		r, f, err := seedReaderOnDisk(numRecords, NoCompression)
@@ -212,24 +210,30 @@ func BenchmarkReader_Nearby(b *testing.B) {
 			if err != nil {
 				b.Fatalf("error finding nearby %d: %v", cellID, err)
 			}
-			if !it.Next() {
-				b.Fatalf("unable to advance cursor on %d", cellID)
+
+			n := 0
+			for it.Next() {
+				n++
 			}
 			if err := it.Err(); err != nil {
 				b.Fatalf("error iterating over block containing cell %d: %v", cellID, err)
 			}
 			it.Release()
+
+			if n != limit {
+				b.Fatalf("unable to iterate across %d, expected %d entries but got %d", cellID, limit, n)
+			}
 		}
 	}
 
 	b.Run("1k limit=3", func(b *testing.B) {
 		runBench(b, 1000, 3)
 	})
-	b.Run("1k limit=100", func(b *testing.B) {
-		runBench(b, 1000, 100)
-	})
 	b.Run("1M limit=3", func(b *testing.B) {
 		runBench(b, 1*1000*1000, 3)
+	})
+	b.Run("1k limit=100", func(b *testing.B) {
+		runBench(b, 1000, 100)
 	})
 	b.Run("1M limit=100", func(b *testing.B) {
 		runBench(b, 1*1000*1000, 100)

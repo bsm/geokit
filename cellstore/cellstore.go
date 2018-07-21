@@ -89,3 +89,18 @@ func releaseBuffer(p []byte) {
 		bufPool.Put(p)
 	}
 }
+
+var intSlicePool sync.Pool
+
+func fetchIntSlice(cp int) []int {
+	if v := intSlicePool.Get(); v != nil {
+		return v.([]int)[:0]
+	}
+	return make([]int, 0, cp)
+}
+
+func releaseIntSlice(p []int) {
+	if cap(p) != 0 {
+		intSlicePool.Put(p)
+	}
+}

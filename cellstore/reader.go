@@ -187,7 +187,7 @@ func (r *Reader) readBlock(bnum int) (*Iterator, error) {
 	numSections := int(binary.LittleEndian.Uint32(buf[len(buf)-4:]))
 	indexOffset := len(buf) - numSections*4
 
-	index := append(make([]int, 0, numSections), 0)
+	index := append(fetchIntSlice(numSections), 0)
 	for n := indexOffset; n < len(buf)-4; n += 4 {
 		index = append(index, int(binary.LittleEndian.Uint32(buf[n:])))
 	}

@@ -171,6 +171,7 @@ func (i *Iterator) Err() error {
 // Release releases the iterator. It must not be used once this method is called.
 func (i *Iterator) Release() {
 	releaseBuffer(i.buf)
+	releaseIntSlice(i.index)
 }
 
 func (i *Iterator) setOffset(boff int) {
