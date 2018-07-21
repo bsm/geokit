@@ -24,35 +24,6 @@
 #   go-tests = true
 #   unused-packages = true
 
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/glaslos/go-osm"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/golang/geo"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/golang/leveldb"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/golang/snappy"
-
-[[constraint]]
-  name = "github.com/onsi/ginkgo"
-  version = "1.6.0"
-
-[[constraint]]
-  name = "github.com/onsi/gomega"
-  version = "1.4.1"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/syndtr/goleveldb"
-
 [prune]
   go-tests = true
   unused-packages = true
