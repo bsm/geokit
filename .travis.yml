@@ -6,4 +6,4 @@ install:
   - go get -u github.com/golang/dep/cmd/dep
   - dep ensure
 script:
-  - make test test-race bench-race
+  - make default test-race bench-race
