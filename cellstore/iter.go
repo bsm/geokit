@@ -117,7 +117,7 @@ func (i *Iterator) fwd(fn func(cellID s2.CellID, bnum, boff int) bool) {
 	}
 }
 
-func (i *Iterator) rev(fn func(cellID s2.CellID, bnum, boff int) bool) {
+func (i *Iterator) rev(fn func(cellID s2.CellID, bnum, boff int, lastInSection bool) bool) {
 	if i.err != nil {
 		return
 	}
@@ -137,7 +137,7 @@ func (i *Iterator) rev(fn func(cellID s2.CellID, bnum, boff int) bool) {
 
 			boff := i.boff
 			for boff < finish && !stop && i.err == nil && i.Next() {
-				stop = !fn(i.CellID(), i.bnum, boff)
+				stop = !fn(i.CellID(), i.bnum, boff, i.boff == finish)
 				boff = i.boff
 			}
 		}

@@ -212,10 +212,10 @@ var _ = Describe("Iterator", func() {
 	})
 
 	It("should forward", func() {
-		it, err := reader.FindBlock(1317624576600000701)
+		it, err := reader.FindBlock(1317624576600000675)
 		Expect(err).NotTo(HaveOccurred())
 		defer it.Release()
-		it.Seek(1317624576600000701)
+		it.Seek(1317624576600000675)
 
 		var (
 			cells []s2.CellID
@@ -229,23 +229,23 @@ var _ = Describe("Iterator", func() {
 			boffs = append(boffs, boff)
 			return true
 		})
-		Expect(cells).To(coverRange(1317624576600000705, 1317624576600000793))
-		Expect(bnums).To(Equal([]int{5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6}))
-		Expect(boffs).To(Equal([]int{1735, 1866, 0, 139, 270, 401, 532, 671, 802, 933, 1064, 1203}))
+		Expect(cells).To(coverRange(1317624576600000681, 1317624576600000793))
+		Expect(bnums).To(Equal([]int{5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6}))
+		Expect(boffs).To(Equal([]int{1334, 1465, 1596, 1735, 1866, 0, 139, 270, 401, 532, 671, 802, 933, 1064, 1203}))
 	})
 
 	It("should forward until condition", func() {
-		it, err := reader.FindBlock(1317624576600000701)
+		it, err := reader.FindBlock(1317624576600000675)
 		Expect(err).NotTo(HaveOccurred())
 		defer it.Release()
-		it.Seek(1317624576600000701)
+		it.Seek(1317624576600000675)
 
 		var cells []s2.CellID
 		it.fwd(func(cellID s2.CellID, bnum, boff int) bool {
 			cells = append(cells, cellID)
 			return len(cells) < 5
 		})
-		Expect(cells).To(coverRange(1317624576600000705, 1317624576600000737))
+		Expect(cells).To(coverRange(1317624576600000681, 1317624576600000713))
 	})
 
 	It("should reverse", func() {
@@ -260,7 +260,7 @@ var _ = Describe("Iterator", func() {
 			boffs []int
 		)
 
-		it.rev(func(cellID s2.CellID, bnum, boff int) bool {
+		it.rev(func(cellID s2.CellID, bnum, boff int, _ bool) bool {
 			cells = append(cells, cellID)
 			bnums = append(bnums, bnum)
 			boffs = append(boffs, boff)
@@ -299,11 +299,26 @@ var _ = Describe("Iterator", func() {
 		it.Seek(1317624576600000171)
 
 		var cells []s2.CellID
-		it.rev(func(cellID s2.CellID, bnum, boff int) bool {
+		it.rev(func(cellID s2.CellID, bnum, boff int, lastInSection bool) bool {
 			cells = append(cells, cellID)
-			return len(cells) < 11
+			return len(cells) < 11 || !lastInSection
 		})
-		Expect(cells).To(coverRange(1317624576600000153, 1317624576600000065))
+		Expect(cells).To(Equal([]s2.CellID{
+			1317624576600000153,
+			1317624576600000161,
+			1317624576600000169,
+			1317624576600000121,
+			1317624576600000129,
+			1317624576600000137,
+			1317624576600000145,
+			1317624576600000097,
+			1317624576600000105,
+			1317624576600000113,
+			1317624576600000065,
+			1317624576600000073,
+			1317624576600000081,
+			1317624576600000089,
+		}))
 	})
 
 })

@@ -83,32 +83,41 @@ func (r *Reader) Nearby(origin s2.CellID, limit int) (*NearbyIterator, error) {
 	it.SeekSection(origin)
 
 	bnum, snum := it.bnum, it.snum
-	maxEntries := limit + 4
-	entries := fetchNearbySlice(2 * maxEntries)
+	numEntries := limit + 4
+	entries := fetchNearbySlice(2 * numEntries)
+
+	// count number of records left and right of the origin
+	var left, right int
 
 	// perform a forward iteration
-	remaining := maxEntries
 	it.fwd(func(cellID s2.CellID, bnum, boff int) bool {
 		entries = append(entries, nearbyEntry{
 			CellID: cellID,
 			bnum:   bnum,
 			boff:   boff,
 		})
-		remaining--
-		return remaining > 0
+		if cellID < origin {
+			left++
+		} else {
+			right++
+		}
+		return right < numEntries
 	})
 
 	// perform a reverse iteration
-	if it.Err() == nil && it.toBlock(bnum) && it.toSection(snum) {
-		remaining = maxEntries
-		it.rev(func(cellID s2.CellID, bnum, boff int) bool {
+	if it.Err() == nil && left < numEntries && it.toBlock(bnum) && it.toSection(snum) {
+		it.rev(func(cellID s2.CellID, bnum, boff int, lastInSection bool) bool {
 			entries = append(entries, nearbyEntry{
 				CellID: cellID,
 				bnum:   bnum,
 				boff:   boff,
 			})
-			remaining--
-			return remaining > 0
+			if cellID < origin {
+				left++
+			} else {
+				right++
+			}
+			return !lastInSection || left < numEntries
 		})
 	}
 

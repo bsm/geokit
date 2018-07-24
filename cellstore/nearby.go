@@ -16,7 +16,6 @@ type NearbyIterator struct {
 }
 
 // Next advances the cursor to the next entry
-// TODO: implement properly
 func (i *NearbyIterator) Next() bool {
 	if np := i.pos + 1; np < len(i.entries) {
 		ent := i.entries[np]
