@@ -7,7 +7,7 @@ import (
 )
 
 var _ = Describe("Iterator", func() {
-	var subject *Iterator
+	var subject, blank *Iterator
 	var reader *Reader
 
 	BeforeEach(func() {
@@ -16,6 +16,8 @@ var _ = Describe("Iterator", func() {
 		var err error
 		subject, err = reader.FindBlock(1317624576600000297)
 		Expect(err).NotTo(HaveOccurred())
+
+		blank = blankIterator(reader, 0)
 	})
 	AfterEach(func() {
 		subject.Release()
@@ -38,6 +40,9 @@ var _ = Describe("Iterator", func() {
 		Expect(subject.Next()).To(BeTrue())
 		Expect(subject.CellID()).To(Equal(s2.CellID(1317624576600000249)))
 		Expect(string(subject.Value())).To(ContainSubstring(subject.CellID().String()))
+
+		Expect(blank.Next()).To(BeFalse())
+		Expect(blank.CellID()).To(Equal(s2.CellID(0)))
 	})
 
 	It("should iterate blocks", func() {
@@ -58,6 +63,9 @@ var _ = Describe("Iterator", func() {
 		Expect(subject.CellID()).To(Equal(s2.CellID(1317624576600000001)))
 
 		Expect(subject.PrevBlock()).To(BeFalse())
+
+		Expect(blank.PrevBlock()).To(BeFalse())
+		Expect(blank.NextBlock()).To(BeTrue())
 	})
 
 	It("should prevent block moves when the beginning/end is reached", func() {
@@ -153,6 +161,10 @@ var _ = Describe("Iterator", func() {
 		Expect(subject.snum).To(Equal(2))
 		Expect(subject.Next()).To(BeTrue())
 		Expect(subject.CellID()).To(Equal(s2.CellID(1317624576600000305)))
+
+		blank.SeekSection(1317624576600000317)
+		Expect(blank.snum).To(Equal(0))
+		Expect(blank.Next()).To(BeFalse())
 	})
 
 	It("should seek entries", func() {
@@ -209,6 +221,10 @@ var _ = Describe("Iterator", func() {
 		Expect(subject.snum).To(Equal(2))
 		Expect(subject.Next()).To(BeTrue())
 		Expect(subject.CellID()).To(Equal(s2.CellID(1317624576600000321)))
+
+		blank.Seek(1317624576600000317)
+		Expect(blank.snum).To(Equal(0))
+		Expect(blank.Next()).To(BeFalse())
 	})
 
 	It("should forward", func() {
@@ -232,6 +248,10 @@ var _ = Describe("Iterator", func() {
 		Expect(cells).To(coverRange(1317624576600000681, 1317624576600000793))
 		Expect(bnums).To(Equal([]int{5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6}))
 		Expect(boffs).To(Equal([]int{1334, 1465, 1596, 1735, 1866, 0, 139, 270, 401, 532, 671, 802, 933, 1064, 1203}))
+
+		Expect(func() {
+			blank.fwd(func(_ s2.CellID, _, _ int) bool { return true })
+		}).NotTo(Panic())
 	})
 
 	It("should forward until condition", func() {
@@ -290,6 +310,10 @@ var _ = Describe("Iterator", func() {
 			532, 671, 802, 933,
 			0, 139, 270, 401,
 		}))
+
+		Expect(func() {
+			blank.rev(func(_ s2.CellID, _, _ int, _ bool) bool { return true })
+		}).NotTo(Panic())
 	})
 
 	It("should reverse until condition", func() {

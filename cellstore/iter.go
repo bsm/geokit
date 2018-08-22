@@ -23,6 +23,10 @@ type Iterator struct {
 	err    error
 }
 
+func blankIterator(parent *Reader, bnum int) *Iterator {
+	return &Iterator{parent: parent, bnum: bnum}
+}
+
 // Next reads the next entry and advances the cursor.
 func (i *Iterator) Next() bool {
 	if i.err != nil {
@@ -70,8 +74,10 @@ func (i *Iterator) SeekSection(cellID s2.CellID) {
 		pos = 0
 	}
 	i.cellID = 0
-	i.boff = i.index[pos]
 	i.snum = pos
+	if pos < len(i.index) {
+		i.boff = i.index[pos]
+	}
 }
 
 // Seek positions the cursor to the cell >= cellID within the current block.
@@ -147,7 +153,9 @@ func (i *Iterator) rev(fn func(cellID s2.CellID, bnum, boff int, lastInSection b
 		}
 
 		finish = len(i.buf)
-		i.snum = len(i.index) - 1
+		if n := len(i.index) - 1; n > -1 {
+			i.snum = n
+		}
 	}
 }
 
@@ -221,6 +229,8 @@ func (i *Iterator) toSection(snum int) bool {
 
 	i.cellID = 0
 	i.snum = snum
-	i.boff = i.index[snum]
+	if snum < len(i.index) {
+		i.boff = i.index[snum]
+	}
 	return true
 }

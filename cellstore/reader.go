@@ -143,14 +143,14 @@ func (r *Reader) FindBlock(cellID s2.CellID) (*Iterator, error) {
 	}
 
 	if len(r.index) == 0 {
-		return &Iterator{parent: r}, nil
+		return blankIterator(r, 0), nil
 	}
 
 	blockPos := sort.Search(len(r.index), func(i int) bool {
 		return r.index[i].MaxCellID >= cellID
 	})
 	if blockPos >= len(r.index) {
-		return &Iterator{parent: r}, nil
+		return blankIterator(r, len(r.index)), nil
 	}
 
 	return r.readBlock(blockPos)
