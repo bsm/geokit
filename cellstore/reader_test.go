@@ -3,6 +3,7 @@ package cellstore
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/golang/geo/s2"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"golang.org/x/exp/mmap"
 )
 
 var _ = Describe("Reader", func() {
@@ -94,18 +96,17 @@ var _ = Describe("Reader", func() {
 
 		Expect(it.Next()).To(BeFalse())
 	})
-
 })
 
 // --------------------------------------------------------------------
 
-func seedReader(n int) *Reader {
+func seedReader(numRecords int) *Reader {
 	buf := new(bytes.Buffer)
 	rnd := rand.New(rand.NewSource(1))
 	val := make([]byte, 128)
 
 	w := NewWriter(buf, &Options{BlockSize: 2 * KiB, SectionSize: 4})
-	for i := 0; i < 8*n; i += 8 {
+	for i := 0; i < 8*numRecords; i += 8 {
 		_, err := rnd.Read(val)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -120,11 +121,12 @@ func seedReader(n int) *Reader {
 	return r
 }
 
-func seedReaderOnDisk(numRecords int, compression Compression) (*Reader, *os.File, error) {
+func seedTempFile(numRecords int, compression Compression) (string, error) {
 	f, err := ioutil.TempFile("", "cellstore-bench")
 	if err != nil {
-		return nil, nil, err
+		return "", err
 	}
+	defer f.Close()
 
 	w := NewWriter(f, &Options{Compression: compression})
 	defer w.Close()
@@ -134,22 +136,45 @@ func seedReaderOnDisk(numRecords int, compression Compression) (*Reader, *os.Fil
 		cellID := seedCellID + s2.CellID(i)
 		if err := w.Append(cellID, v); err != nil {
 			_ = f.Close()
-			return nil, nil, err
+			return "", err
 		}
 	}
 	if err := w.Close(); err != nil {
 		_ = f.Close()
-		return nil, nil, err
+		return "", err
 	}
-	if err := f.Close(); err != nil {
+	return f.Name(), f.Close()
+}
+
+func openSeed(name string, mmaped bool) (*Reader, io.Closer, error) {
+	if mmaped {
+		return openMmap(name)
+	}
+	return openFile(name)
+}
+
+func openMmap(name string) (*Reader, io.Closer, error) {
+	ra, err := mmap.Open(name)
+	if err != nil {
 		return nil, nil, err
 	}
 
-	if f, err = os.Open(f.Name()); err != nil {
+	r, err := NewReader(ra, int64(ra.Len()))
+	if err != nil {
+		_ = ra.Close()
 		return nil, nil, err
 	}
 
-	fi, err := os.Stat(f.Name())
+	return r, ra, nil
+}
+
+func openFile(name string) (*Reader, io.Closer, error) {
+	f, err := os.Open(name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	fi, err := f.Stat()
 	if err != nil {
 		_ = f.Close()
 		return nil, nil, err
@@ -166,13 +191,18 @@ func seedReaderOnDisk(numRecords int, compression Compression) (*Reader, *os.Fil
 // --------------------------------------------------------------------
 
 func BenchmarkReader(b *testing.B) {
-	runBench := func(b *testing.B, numRecords int, compression Compression) {
-		r, f, err := seedReaderOnDisk(numRecords, compression)
+	runBench := func(b *testing.B, numRecords int, compression Compression, mmaped bool) {
+		fname, err := seedTempFile(numRecords, compression)
 		if err != nil {
 			b.Fatal(err)
 		}
-		defer os.Remove(f.Name())
-		defer f.Close()
+		defer os.Remove(fname)
+
+		r, closer, err := openSeed(fname, mmaped)
+		if err != nil {
+			b.Fatal(err)
+		}
+		defer closer.Close()
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -192,16 +222,13 @@ func BenchmarkReader(b *testing.B) {
 		}
 	}
 
-	b.Run("1k uncompressed", func(b *testing.B) {
-		runBench(b, 1000, NoCompression)
+	b.Run("10M plain", func(b *testing.B) {
+		runBench(b, 1e7, NoCompression, false)
 	})
-	b.Run("10M uncompressed", func(b *testing.B) {
-		runBench(b, 10*1000*1000, NoCompression)
-	})
-	b.Run("1k snappy", func(b *testing.B) {
-		runBench(b, 1000, SnappyCompression)
+	b.Run("10M mmaped", func(b *testing.B) {
+		runBench(b, 1e7, NoCompression, true)
 	})
 	b.Run("10M snappy", func(b *testing.B) {
-		runBench(b, 10*1000*1000, SnappyCompression)
+		runBench(b, 1e7, SnappyCompression, false)
 	})
 }

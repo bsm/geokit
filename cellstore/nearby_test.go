@@ -201,12 +201,17 @@ var _ = Describe("nearbySlice", func() {
 
 func BenchmarkReader_Nearby(b *testing.B) {
 	runBench := func(b *testing.B, numRecords int, limit int) {
-		r, f, err := seedReaderOnDisk(numRecords, NoCompression)
+		fname, err := seedTempFile(numRecords, NoCompression)
 		if err != nil {
 			b.Fatal(err)
 		}
-		defer os.Remove(f.Name())
-		defer f.Close()
+		defer os.Remove(fname)
+
+		r, closer, err := openSeed(fname, false)
+		if err != nil {
+			b.Fatal(err)
+		}
+		defer closer.Close()
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -232,16 +237,16 @@ func BenchmarkReader_Nearby(b *testing.B) {
 		}
 	}
 
-	b.Run("1k limit=3", func(b *testing.B) {
-		runBench(b, 1000, 3)
+	b.Run("limit:1", func(b *testing.B) {
+		runBench(b, 1e7, 1)
 	})
-	b.Run("1M limit=3", func(b *testing.B) {
-		runBench(b, 1*1000*1000, 3)
+	b.Run("limit:5", func(b *testing.B) {
+		runBench(b, 1e7, 5)
 	})
-	b.Run("1k limit=100", func(b *testing.B) {
-		runBench(b, 1000, 100)
+	b.Run("limit:20", func(b *testing.B) {
+		runBench(b, 1e7, 20)
 	})
-	b.Run("1M limit=100", func(b *testing.B) {
-		runBench(b, 1*1000*1000, 100)
+	b.Run("limit:100", func(b *testing.B) {
+		runBench(b, 1e7, 100)
 	})
 }
