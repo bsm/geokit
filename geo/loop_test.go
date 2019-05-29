@@ -8,20 +8,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = DescribeTable("should show overlaps",
-	func(cell s2.Cell, o LoopOverlap) {
-		loop := s2.LoopFromPoints(colorado)
-		Expect(LoopIntersectsWithCell(loop, cell)).To(Equal(o))
-	},
-
-	// https://codepen.io/bsm/pen/dRqRrp
-	Entry("487", s2.CellFromCellID(s2.CellIDFromToken("487")), LoopOverlap_None),
-	Entry("874", s2.CellFromCellID(s2.CellIDFromToken("874")), LoopOverlap_ContainedByCell),
-	Entry("877", s2.CellFromCellID(s2.CellIDFromToken("877")), LoopOverlap_Partial),
-	Entry("87174", s2.CellFromCellID(s2.CellIDFromToken("87174")), LoopOverlap_None),
-	Entry("87407", s2.CellFromCellID(s2.CellIDFromToken("87407")), LoopOverlap_ContainsCell),
-)
-
 var _ = Describe("LoopIntersectionWithCell", func() {
 
 	// https://codepen.io/bsm/full/yXxoBw
@@ -192,17 +178,15 @@ var _ = Describe("FitLoop", func() {
 
 	It("should fit loop-iterate", func() {
 		var cellID s2.CellID
-		var overlap LoopOverlap
 		var n int
 
-		FitLoopDo(loop, 7, func(id s2.CellID, s LoopOverlap) bool {
+		FitLoopDo(loop, 7, func(id s2.CellID) bool {
 			n++
-			cellID, overlap = id, s
+			cellID = id
 			return false
 		})
 		Expect(n).To(Equal(1))
 		Expect(cellID.ToToken()).To(Equal("8708c"))
-		Expect(overlap).To(Equal(LoopOverlap_Partial))
 	})
 
 })
