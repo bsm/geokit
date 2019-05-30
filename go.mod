@@ -1,6 +1,7 @@
 module github.com/bsm/geokit
 
 require (
+	github.com/bsm/extsort v0.4.0
 	github.com/glaslos/go-osm v0.0.0-20170316165313-16aac6148584
 	github.com/golang/geo v0.0.0-20190507233405-a0e886e97a51
 	github.com/golang/protobuf v1.3.1 // indirect

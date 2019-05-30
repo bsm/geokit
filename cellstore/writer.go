@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/bsm/extsort"
 	"github.com/golang/geo/s2"
 	"github.com/golang/snappy"
 )
@@ -12,7 +13,7 @@ import (
 // Writer represents a cellstore Writer
 type Writer struct {
 	w io.Writer
-	o Options
+	o *Options
 
 	block blockInfo // the current block info
 	blen  int       // the number of entries in the current block
@@ -27,15 +28,9 @@ type Writer struct {
 
 // NewWriter wraps a writer and returns a cellstore Writer
 func NewWriter(w io.Writer, o *Options) *Writer {
-	var opts Options
-	if o != nil {
-		opts = *o
-	}
-	opts.norm()
-
 	return &Writer{
 		w:   w,
-		o:   opts,
+		o:   o.norm(),
 		tmp: make([]byte, 2*binary.MaxVarintLen64),
 	}
 }
@@ -168,4 +163,82 @@ func (w *Writer) flush() error {
 	w.blen = 0
 
 	return w.writeRaw(block)
+}
+
+// SortWriter supports out-of-order appends but is significantly slower than
+// standard Writer.
+type SortWriter struct {
+	w io.Writer
+	x *extsort.Sorter
+	o *Options
+
+	scratch []byte
+}
+
+// NewSortWriter wraps a writer.
+func NewSortWriter(w io.Writer, o *Options) *SortWriter {
+	o = o.norm()
+
+	return &SortWriter{
+		w: w,
+		x: extsort.New(&extsort.Options{WorkDir: o.TempDir}),
+		o: o,
+	}
+}
+
+// Append appends a cell to the store.
+// Cells can be added to the writer in any order but must not contain duplicated.
+// WARNING: duplicate cell data will be simply ignored.
+func (w *SortWriter) Append(cellID s2.CellID, data []byte) error {
+	if !cellID.IsValid() {
+		return errInvalidCellID
+	}
+
+	chain := w.needScratch(8 + len(data))
+	binary.BigEndian.PutUint64(chain[0:], uint64(cellID))
+	copy(chain[8:], data)
+	return w.x.Append(chain)
+}
+
+// Close closes the writer.
+func (w *SortWriter) Close() error {
+	defer w.x.Close()
+
+	iter, err := w.x.Sort()
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	ww := NewWriter(w.w, w.o)
+	prevID := s2.SentinelCellID
+	for iter.Next() {
+		chain := iter.Data()
+		cellID := s2.CellID(binary.BigEndian.Uint64(chain))
+		if cellID != prevID {
+			data := w.needScratch(len(chain) - 8)
+			copy(data, chain[8:])
+
+			if err := ww.Append(cellID, data); err != nil {
+				return err
+			}
+		}
+		prevID = cellID
+	}
+	if err := iter.Err(); err != nil {
+		return err
+	}
+	if err := ww.Close(); err != nil {
+		return err
+	}
+	return w.x.Close()
+}
+
+func (w *SortWriter) needScratch(sz int) []byte {
+	if sz < cap(w.scratch) {
+		w.scratch = w.scratch[:sz]
+	} else {
+		w.scratch = make([]byte, sz)
+	}
+	return w.scratch
 }

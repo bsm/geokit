@@ -50,18 +50,27 @@ type Options struct {
 
 	// The compression algorithm to use. Default: SnappyCompression.
 	Compression Compression
+
+	// An optional temporary directory, used by SortWriter. Default: os.TempDir()
+	TempDir string
 }
 
-func (o *Options) norm() {
-	if o.BlockSize < 1 {
-		o.BlockSize = 16 * KiB
+func (o *Options) norm() *Options {
+	var oo Options
+	if o != nil {
+		oo = *o
 	}
-	if o.SectionSize < 1 {
-		o.SectionSize = 16
+
+	if oo.BlockSize < 1 {
+		oo.BlockSize = 16 * KiB
 	}
-	if !o.Compression.isValid() {
-		o.Compression = SnappyCompression
+	if oo.SectionSize < 1 {
+		oo.SectionSize = 16
 	}
+	if !oo.Compression.isValid() {
+		oo.Compression = SnappyCompression
+	}
+	return &oo
 }
 
 // --------------------------------------------------------------------

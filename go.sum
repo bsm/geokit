@@ -1,4 +1,6 @@
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
+github.com/bsm/extsort v0.4.0 h1:OdeKnkxG60j2YaRA3KWdeZZR564HBJZM9fcwD0Ruhfc=
+github.com/bsm/extsort v0.4.0/go.mod h1:TO1FBW+7rDpROdgi5ylsP53g5uZgSvjl9SsdfDRxRqc=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/glaslos/go-osm v0.0.0-20170316165313-16aac6148584 h1:eeXnxX/yiPA26JTLtZJzstDd6y2iCRJPPuizZkWwQyM=
