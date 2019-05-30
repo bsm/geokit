@@ -105,7 +105,7 @@ func seedReader(numRecords int) *Reader {
 	rnd := rand.New(rand.NewSource(1))
 	val := make([]byte, 128)
 
-	w := NewWriter(buf, &Options{BlockSize: 2 * KiB, SectionSize: 4})
+	w := NewWriter(buf, &WriterOptions{BlockSize: 2 * KiB, SectionSize: 4})
 	for i := 0; i < 8*numRecords; i += 8 {
 		_, err := rnd.Read(val)
 		Expect(err).NotTo(HaveOccurred())
@@ -128,7 +128,7 @@ func seedTempFile(numRecords int, compression Compression) (string, error) {
 	}
 	defer f.Close()
 
-	w := NewWriter(f, &Options{Compression: compression})
+	w := NewWriter(f, &WriterOptions{Compression: compression})
 	defer w.Close()
 
 	v := []byte("testdatatestdatatestdata")

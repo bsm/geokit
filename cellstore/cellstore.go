@@ -41,38 +41,6 @@ const (
 	unknownCompression
 )
 
-type Options struct {
-	// The size of a block. Must be >= 1KiB. Default: 16KiB.
-	BlockSize int
-
-	// The maximum number of entries per section. Must be > 0. Default: 16.
-	SectionSize int
-
-	// The compression algorithm to use. Default: SnappyCompression.
-	Compression Compression
-
-	// An optional temporary directory, used by SortWriter. Default: os.TempDir()
-	TempDir string
-}
-
-func (o *Options) norm() *Options {
-	var oo Options
-	if o != nil {
-		oo = *o
-	}
-
-	if oo.BlockSize < 1 {
-		oo.BlockSize = 16 * KiB
-	}
-	if oo.SectionSize < 1 {
-		oo.SectionSize = 16
-	}
-	if !oo.Compression.isValid() {
-		oo.Compression = SnappyCompression
-	}
-	return &oo
-}
-
 // --------------------------------------------------------------------
 
 type blockInfo struct {
