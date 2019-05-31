@@ -4,6 +4,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/golang/geo/s1"
 	"github.com/golang/geo/s2"
 )
 
@@ -37,6 +38,14 @@ func (i *NearbyIterator) CellID() s2.CellID {
 	return 0
 }
 
+// Distance returns the distance to the origin at the current cursor position.
+func (i *NearbyIterator) Distance() s1.Angle {
+	if i.pos < len(i.entries) {
+		return i.entries[i.pos].distance
+	}
+	return s1.InfAngle()
+}
+
 // Value returns the value at the current cursor position.
 func (i *NearbyIterator) Value() []byte {
 	return i.block.Value()
@@ -57,25 +66,17 @@ func (i *NearbyIterator) Err() error {
 
 type nearbyEntry struct {
 	s2.CellID
-	bnum int // block number
-	boff int // block offset
+	bnum     int // block number
+	boff     int // block offset
+	distance s1.Angle
 }
 
 type nearbySlice []nearbyEntry
 
-func (s nearbySlice) SortByDistance(origin s2.CellID) {
-	sort.Slice(s, func(i, j int) bool {
-		o := origin.Point()
-		return o.Distance(s[i].Point()) < o.Distance(s[j].Point())
-	})
-}
-
-func (s nearbySlice) Sort() {
-	sort.Slice(s, func(i, j int) bool {
-		return s[i].CellID < s[j].CellID
-	})
-}
-
+func (s nearbySlice) Len() int           { return len(s) }
+func (s nearbySlice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s nearbySlice) Less(i, j int) bool { return s[i].distance < s[j].distance }
+func (s nearbySlice) SortByDistance()    { sort.Sort(s) }
 func (s nearbySlice) Limit(limit int) nearbySlice {
 	if limit < len(s) {
 		s = s[:limit]

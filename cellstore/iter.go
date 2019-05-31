@@ -196,6 +196,16 @@ func (i *Iterator) setOffset(boff int) {
 
 }
 
+func (i *Iterator) moveTo(bnum, snum int) bool {
+	if i.bnum != bnum && !i.toBlock(bnum) {
+		return false
+	}
+	if i.snum != snum && !i.toSection(snum) {
+		return false
+	}
+	return true
+}
+
 func (i *Iterator) toBlock(bnum int) bool {
 	if i.err != nil {
 		return false

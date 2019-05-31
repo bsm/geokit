@@ -7,6 +7,7 @@ import (
 	"github.com/golang/geo/s2"
 )
 
+// Bytes-size unit
 const (
 	KiB = 1024
 	MiB = 1024 * KiB
@@ -29,12 +30,14 @@ const (
 
 // --------------------------------------------------------------------
 
+// Compression is the compression codec
 type Compression byte
 
 func (c Compression) isValid() bool {
 	return c >= NoCompression && c <= unknownCompression
 }
 
+// Supported compression codecs
 const (
 	NoCompression Compression = iota + 1
 	SnappyCompression
