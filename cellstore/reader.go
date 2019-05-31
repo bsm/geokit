@@ -75,44 +75,50 @@ func (r *Reader) NumBlocks() int {
 
 // Nearby returns a limited iterator over close to cellID.
 // Please note that the iterator entries are not sorted.
-func (r *Reader) Nearby(origin s2.CellID, limit int) (*NearbyIterator, error) {
-	it, err := r.FindBlock(origin)
+func (r *Reader) Nearby(cellID s2.CellID, limit int) (*NearbyIterator, error) {
+	it, err := r.FindBlock(cellID)
 	if err != nil {
 		return nil, err
 	}
-	it.SeekSection(origin)
+	it.SeekSection(cellID)
 
-	bnum, snum := it.bnum, it.snum
+	obnum, osnum := it.bnum, it.snum
 	numEntries := limit + 4
 	entries := fetchNearbySlice(2 * numEntries)
+	origin := cellID.Point()
 
 	// count number of records left and right of the origin
 	var left, right int
 
 	// perform a forward iteration
-	it.fwd(func(cellID s2.CellID, bnum, boff int) bool {
+	it.fwd(func(cID s2.CellID, bnum, boff int) bool {
 		entries = append(entries, nearbyEntry{
-			CellID: cellID,
-			bnum:   bnum,
-			boff:   boff,
+			CellID:   cID,
+			distance: cID.Point().Distance(origin),
+			bnum:     bnum,
+			boff:     boff,
 		})
-		if cellID < origin {
+		if cID < cellID {
 			left++
 		} else {
 			right++
 		}
 		return right < numEntries
 	})
+	if err := it.Err(); err != nil {
+		return nil, err
+	}
 
 	// perform a reverse iteration
-	if it.Err() == nil && left < numEntries && it.toBlock(bnum) && it.toSection(snum) {
-		it.rev(func(cellID s2.CellID, bnum, boff int, lastInSection bool) bool {
+	if left < numEntries && it.moveTo(obnum, osnum) {
+		it.rev(func(cID s2.CellID, bnum, boff int, lastInSection bool) bool {
 			entries = append(entries, nearbyEntry{
-				CellID: cellID,
-				bnum:   bnum,
-				boff:   boff,
+				CellID:   cID,
+				distance: cID.Point().Distance(origin),
+				bnum:     bnum,
+				boff:     boff,
 			})
-			if cellID < origin {
+			if cID < cellID {
 				left++
 			} else {
 				right++
@@ -125,9 +131,8 @@ func (r *Reader) Nearby(origin s2.CellID, limit int) (*NearbyIterator, error) {
 		return nil, err
 	}
 
-	entries.SortByDistance(origin)
+	entries.SortByDistance()
 	entries = entries.Limit(limit)
-	entries.Sort()
 
 	return &NearbyIterator{
 		block:   it,
