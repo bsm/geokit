@@ -1,215 +1,173 @@
 package cellstore
 
 import (
-	"bytes"
-	"encoding/binary"
 	"io"
-	"sort"
 
+	"github.com/bsm/sntable"
 	"github.com/golang/geo/s2"
-	"github.com/golang/snappy"
 )
 
 // Reader represents a cellstore reader
 type Reader struct {
-	r io.ReaderAt
-
-	index       []blockInfo
-	indexOffset int64
+	*sntable.Reader
 }
 
 // NewReader opens a reader.
 func NewReader(r io.ReaderAt, size int64) (*Reader, error) {
-	tmp := make([]byte, 16+binary.MaxVarintLen64)
-
-	// read footer
-	footerOffset := size - 16
-	if _, err := r.ReadAt(tmp[:16], footerOffset); err != nil {
-		return nil, err
-	}
-
-	// parse footer
-	if !bytes.Equal(tmp[8:16], magic) {
-		return nil, errBadMagic
-	}
-	indexOffset := int64(binary.LittleEndian.Uint64(tmp[:8]))
-
-	// read index
-	var index []blockInfo
-	var info blockInfo
-
-	for pos := indexOffset; pos < footerOffset; {
-		tmp = tmp[:2*binary.MaxVarintLen64]
-		if x := footerOffset - pos; x < int64(len(tmp)) {
-			tmp = tmp[:int(x)]
-		}
-
-		_, err := r.ReadAt(tmp, pos)
-		if err != nil {
-			return nil, err
-		}
-
-		u1, n := binary.Uvarint(tmp[0:])
-		pos += int64(n)
-
-		u2, n := binary.Uvarint(tmp[n:])
-		pos += int64(n)
-
-		info.MaxCellID += s2.CellID(u1)
-		info.Offset += int64(u2)
-		index = append(index, info)
-	}
-
-	return &Reader{
-		r: r,
-
-		index:       index,
-		indexOffset: indexOffset,
-	}, nil
-}
-
-// NumBlocks returns the number of stored blocks.
-func (r *Reader) NumBlocks() int {
-	return len(r.index)
-}
-
-// Nearby returns a limited iterator over close to cellID.
-// Please note that the iterator entries are not sorted.
-func (r *Reader) Nearby(cellID s2.CellID, limit int) (*NearbyIterator, error) {
-	it, err := r.FindBlock(cellID)
+	tr, err := sntable.NewReader(r, size)
 	if err != nil {
 		return nil, err
 	}
-	it.SeekSection(cellID)
-
-	obnum, osnum := it.bnum, it.snum
-	numEntries := limit + 4
-	entries := fetchNearbySlice(2 * numEntries)
-	origin := cellID.Point()
-
-	// count number of records left and right of the origin
-	var left, right int
-
-	// perform a forward iteration
-	it.fwd(func(cID s2.CellID, bnum, boff int) bool {
-		entries = append(entries, nearbyEntry{
-			CellID:   cID,
-			distance: cID.Point().Distance(origin),
-			bnum:     bnum,
-			boff:     boff,
-		})
-		if cID < cellID {
-			left++
-		} else {
-			right++
-		}
-		return right < numEntries
-	})
-	if err := it.Err(); err != nil {
-		return nil, err
-	}
-
-	// perform a reverse iteration
-	if left < numEntries && it.moveTo(obnum, osnum) {
-		it.rev(func(cID s2.CellID, bnum, boff int, lastInSection bool) bool {
-			entries = append(entries, nearbyEntry{
-				CellID:   cID,
-				distance: cID.Point().Distance(origin),
-				bnum:     bnum,
-				boff:     boff,
-			})
-			if cID < cellID {
-				left++
-			} else {
-				right++
-			}
-			return !lastInSection || left < numEntries
-		})
-	}
-
-	if err := it.Err(); err != nil {
-		return nil, err
-	}
-
-	entries.SortByDistance()
-	entries = entries.Limit(limit)
-
-	return &NearbyIterator{
-		block:   it,
-		entries: entries,
-		pos:     -1,
-	}, nil
+	return &Reader{Reader: tr}, nil
 }
 
-// FindBlock returns the block which is closest to the given cellID.
-func (r *Reader) FindBlock(cellID s2.CellID) (*Iterator, error) {
+// FindSection finds a section right before the the cellID.
+func (r *Reader) FindSection(cellID s2.CellID) (*SectionIterator, error) {
 	if !cellID.IsValid() {
 		return nil, errInvalidCellID
 	}
 
-	if len(r.index) == 0 {
-		return blankIterator(r, 0), nil
-	}
-
-	blockPos := sort.Search(len(r.index), func(i int) bool {
-		return r.index[i].MaxCellID >= cellID
-	})
-	if blockPos >= len(r.index) {
-		return blankIterator(r, len(r.index)), nil
-	}
-
-	return r.readBlock(blockPos)
-}
-
-func (r *Reader) readBlock(bnum int) (*Iterator, error) {
-	min := r.index[bnum].Offset
-	max := r.indexOffset
-	if next := bnum + 1; next < len(r.index) {
-		max = r.index[next].Offset
-	}
-
-	raw := fetchBuffer(int(max - min))
-	if _, err := r.r.ReadAt(raw, min); err != nil {
-		releaseBuffer(raw)
+	key := uint64(cellID)
+	b, err := r.SeekBlock(key)
+	if err != nil {
 		return nil, err
 	}
 
-	var buf []byte
-	switch maxPos := len(raw) - 1; raw[maxPos] {
-	case blockNoCompression:
-		buf = raw[:maxPos]
-	case blockSnappyCompression:
-		defer releaseBuffer(raw)
+	s := b.SeekSection(key)
+	return &SectionIterator{r: r, b: b, s: s, bpos: b.Pos(), spos: s.Pos()}, nil
+}
 
-		sz, err := snappy.DecodedLen(raw[:maxPos])
-		if err != nil {
-			return nil, err
-		}
+// Nearby returns a limited iterator over close to cellID.
+// Please note that the iterator entries are not sorted.
+func (r *Reader) Nearby(cellID s2.CellID, limit int) (NearbySlice, error) {
+	iter, err := r.FindSection(cellID)
+	if err != nil {
+		return nil, err
+	}
+	defer iter.Release()
 
-		pln := fetchBuffer(sz)
-		res, err := snappy.Decode(pln, raw[:maxPos])
-		if err != nil {
-			releaseBuffer(pln)
-			return nil, err
+	numEntries := limit + 4
+	entries := makeNearbySlice(2 * numEntries)
+	origin := cellID.Point()
+
+	// count number of records left and right of pivot
+	var left, right int
+
+ForwardLoop:
+	for {
+		for iter.Next() {
+			cID := iter.CellID()
+			entries = append(entries,
+				NearbyEntry{CellID: cID, Distance: cID.Point().Distance(origin)})
+			if cID < cellID {
+				left++
+			} else if right++; right >= numEntries {
+				break ForwardLoop
+			}
 		}
-		buf = res
-	default:
-		releaseBuffer(raw)
-		return nil, errInvalidCompression
+		if !iter.NextSection() {
+			break
+		}
 	}
 
-	numSections := int(binary.LittleEndian.Uint32(buf[len(buf)-4:]))
-	indexOffset := len(buf) - numSections*4
+	iter.Reset()
 
-	index := append(fetchIntSlice(numSections), 0)
-	for n := indexOffset; n < len(buf)-4; n += 4 {
-		index = append(index, int(binary.LittleEndian.Uint32(buf[n:])))
+ReverseLoop:
+	for iter.PrevSection() {
+		for iter.Next() {
+			ent := iter.CellID()
+			entries = append(entries,
+				NearbyEntry{CellID: ent, Distance: ent.Point().Distance(origin)})
+			if ent >= cellID {
+				right++
+			} else if left++; left >= numEntries {
+				break ReverseLoop
+			}
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return nil, err
 	}
 
-	return &Iterator{
-		parent: r,
-		bnum:   bnum,
-		index:  index,
-		buf:    buf[:indexOffset],
-	}, nil
+	entries.Sort()
+	return entries.limit(limit), nil
+}
+
+// --------------------------------------------------------------------
+
+// SectionIterator is a section iterator
+type SectionIterator struct {
+	r *Reader
+	b *sntable.BlockReader
+	s *sntable.SectionReader
+
+	bpos int // original block position
+	spos int // original section position
+	err  error
+}
+
+// Release releases the iterator to the pool.
+func (i *SectionIterator) Release() {
+	i.b.Release()
+	i.s.Release()
+	i.err = errReleased
+}
+
+// Err exposes errors.
+func (i *SectionIterator) Err() error { return i.err }
+
+// CellID returns the CellID of the current entry.
+func (i *SectionIterator) CellID() s2.CellID { return s2.CellID(i.s.Key()) }
+
+// Value returns the data of the current entry.
+func (i *SectionIterator) Value() []byte { return i.s.Value() }
+
+// Next advances the cursor to the next entry in the section.
+func (i *SectionIterator) Next() bool { return i.s.Next() }
+
+// NextSection advances the iterator to the next section.
+func (i *SectionIterator) NextSection() bool {
+	if n := i.s.Pos() + 1; n < i.b.NumSections() {
+		return i.moveTo(i.b.Pos(), n)
+	} else if n := i.b.Pos() + 1; n < i.r.NumBlocks() {
+		return i.moveTo(n, 0)
+	}
+	return false
+}
+
+// PrevSection advances the cursor to the begin of the previous section.
+func (i *SectionIterator) PrevSection() bool {
+	if n := i.s.Pos() - 1; n > -1 {
+		return i.moveTo(i.b.Pos(), n)
+	} else if n := i.b.Pos() - 1; n > -1 {
+		return i.moveTo(n, -1)
+	}
+	return false
+}
+
+// Reset resets the position to the origin.
+func (i *SectionIterator) Reset() bool {
+	return i.moveTo(i.bpos, i.spos)
+}
+
+func (i *SectionIterator) moveTo(bpos, spos int) bool {
+	if i.err != nil {
+		return false
+	}
+
+	if i.b.Pos() != bpos {
+		i.b.Release()
+		i.b, i.err = i.r.GetBlock(bpos)
+		return i.moveTo(bpos, spos)
+	}
+
+	if spos < 0 {
+		spos = i.b.NumSections() - spos
+	}
+
+	if i.s.Pos() != spos {
+		i.s.Release()
+		i.s = i.b.GetSection(spos)
+	}
+	return true
 }

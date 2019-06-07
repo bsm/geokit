@@ -1,15 +1,16 @@
-package cellstore
+package cellstore_test
 
 import (
+	"github.com/bsm/geokit/cellstore"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Sorter", func() {
-	var subject *Sorter
+	var subject *cellstore.Sorter
 
 	BeforeEach(func() {
-		subject = NewSorter(nil)
+		subject = cellstore.NewSorter(nil)
 	})
 
 	AfterEach(func() {
