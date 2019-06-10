@@ -33,13 +33,23 @@ var _ = Describe("Reader", func() {
 		return res, it.Err()
 	}
 
-	coverRange := func(min, max s2.CellID) types.GomegaMatcher {
+	CoverRange := func(min, max s2.CellID) types.GomegaMatcher {
 		return WithTransform(func(cells []s2.CellID) []s2.CellID {
 			if len(cells) == 0 {
 				return nil
 			}
 			return []s2.CellID{cells[0], cells[len(cells)-1]}
 		}, Equal([]s2.CellID{min, max}))
+	}
+
+	ContainCells := func(cellIDs ...s2.CellID) types.GomegaMatcher {
+		return WithTransform(func(rs *cellstore.NearbyRS) []s2.CellID {
+			actual := make([]s2.CellID, 0, rs.Len())
+			for _, ent := range rs.Entries {
+				actual = append(actual, ent.CellID)
+			}
+			return actual
+		}, Equal(cellIDs))
 	}
 
 	BeforeEach(func() {
@@ -53,18 +63,18 @@ var _ = Describe("Reader", func() {
 	})
 
 	It("should find blocks", func() {
-		Expect(findSection(1317624576599999999)).To(coverRange(1317624576600000001, 1317624576600000057))
-		Expect(findSection(1317624576600000001)).To(coverRange(1317624576600000001, 1317624576600000057))
-		Expect(findSection(1317624576600000057)).To(coverRange(1317624576600000001, 1317624576600000057))
-		Expect(findSection(1317624576600000059)).To(coverRange(1317624576600000001, 1317624576600000057))
-		Expect(findSection(1317624576600000065)).To(coverRange(1317624576600000065, 1317624576600000113))
-		Expect(findSection(1317624576600000113)).To(coverRange(1317624576600000065, 1317624576600000113))
-		Expect(findSection(1317624576600000305)).To(coverRange(1317624576600000305, 1317624576600000353))
-		Expect(findSection(1317624576600000397)).To(coverRange(1317624576600000361, 1317624576600000417))
-		Expect(findSection(1317624576600000555)).To(coverRange(1317624576600000545, 1317624576600000593))
-		Expect(findSection(1317624576600000633)).To(coverRange(1317624576600000601, 1317624576600000657))
-		Expect(findSection(1317624576600000721)).To(coverRange(1317624576600000721, 1317624576600000777))
-		Expect(findSection(1317624576600000793)).To(coverRange(1317624576600000785, 1317624576600000793))
+		Expect(findSection(1317624576599999999)).To(CoverRange(1317624576600000001, 1317624576600000057))
+		Expect(findSection(1317624576600000001)).To(CoverRange(1317624576600000001, 1317624576600000057))
+		Expect(findSection(1317624576600000057)).To(CoverRange(1317624576600000001, 1317624576600000057))
+		Expect(findSection(1317624576600000059)).To(CoverRange(1317624576600000001, 1317624576600000057))
+		Expect(findSection(1317624576600000065)).To(CoverRange(1317624576600000065, 1317624576600000113))
+		Expect(findSection(1317624576600000113)).To(CoverRange(1317624576600000065, 1317624576600000113))
+		Expect(findSection(1317624576600000305)).To(CoverRange(1317624576600000305, 1317624576600000353))
+		Expect(findSection(1317624576600000397)).To(CoverRange(1317624576600000361, 1317624576600000417))
+		Expect(findSection(1317624576600000555)).To(CoverRange(1317624576600000545, 1317624576600000593))
+		Expect(findSection(1317624576600000633)).To(CoverRange(1317624576600000601, 1317624576600000657))
+		Expect(findSection(1317624576600000721)).To(CoverRange(1317624576600000721, 1317624576600000777))
+		Expect(findSection(1317624576600000793)).To(CoverRange(1317624576600000785, 1317624576600000793))
 
 		Expect(findSection(1317624576600000305)).To(Equal([]s2.CellID{
 			1317624576600000305, 1317624576600000313, 1317624576600000321, 1317624576600000329,
@@ -78,39 +88,47 @@ var _ = Describe("Reader", func() {
 	})
 
 	It("should find nearby", func() {
-		Expect(subject.Nearby(1317624576600000281, 10)).To(Equal(cellstore.NearbySlice{
-			{CellID: 1317624576600000281, Distance: 0},
-			{CellID: 1317624576600000289, Distance: 2.065858318878628e-09},
-			{CellID: 1317624576600000273, Distance: 2.065858319559901e-09},
-			{CellID: 1317624576600000225, Distance: 3.0632528155939624e-09},
-			{CellID: 1317624576600000313, Distance: 3.838163546776104e-09},
-			{CellID: 1317624576600000305, Distance: 4.016656072130737e-09},
-			{CellID: 1317624576600000257, Distance: 4.016656136926289e-09},
-			{CellID: 1317624576600000217, Distance: 4.131716651009279e-09},
-			{CellID: 1317624576600000265, Distance: 4.229445961321704e-09},
-			{CellID: 1317624576600000297, Distance: 4.2294460080894625e-09},
-		}))
+		rs, err := subject.Nearby(1317624576600000281, 10)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(rs).To(ContainCells(
+			1317624576600000281,
+			1317624576600000289,
+			1317624576600000273,
+			1317624576600000225,
+			1317624576600000313,
+			1317624576600000305,
+			1317624576600000257,
+			1317624576600000217,
+			1317624576600000265,
+			1317624576600000297,
+		))
 
-		Expect(subject.Nearby(seedCellID-100, 4)).To(Equal(cellstore.NearbySlice{
-			{CellID: 1317624576600000009, Distance: 1.2253011226980189e-08},
-			{CellID: 1317624576600000001, Distance: 1.2701701528715798e-08},
-			{CellID: 1317624576600000017, Distance: 1.5316264093292792e-08},
-			{CellID: 1317624576600000025, Distance: 1.699110896509436e-08},
-		}))
+		ent := rs.Entries[5]
+		Expect(ent.CellID).To(Equal(s2.CellID(1317624576600000305)))
+		Expect(ent.Distance).To(BeNumerically("~", 4.02e-09, 1e-11))
+		Expect(ent.Value).To(HaveLen(128))
+		Expect(string(ent.Value[:32])).To(Equal(ent.CellID.String()))
 
-		Expect(subject.Nearby(seedCellID+1000, 4)).To(Equal(cellstore.NearbySlice{
-			{CellID: 1317624576600000761, Distance: 1.2395149746231557e-08},
-			{CellID: 1317624576600000785, Distance: 1.2701701569109659e-08},
-			{CellID: 1317624576600000753, Distance: 1.4461008021832347e-08},
-			{CellID: 1317624576600000793, Distance: 1.4580031296083393e-08},
-		}))
+		Expect(subject.Nearby(seedCellID-100, 4)).To(ContainCells(
+			1317624576600000009,
+			1317624576600000001,
+			1317624576600000017,
+			1317624576600000025,
+		))
 
-		Expect(subject.Nearby(1317624576600000059, 4)).To(Equal(cellstore.NearbySlice{
-			{CellID: 1317624576600000057, Distance: 1.276496528623452e-09},
-			{CellID: 1317624576600000049, Distance: 1.5316264321152526e-09},
-			{CellID: 1317624576600000033, Distance: 2.877282933284805e-09},
-			{CellID: 1317624576600000073, Distance: 2.8772830287687246e-09},
-		}))
+		Expect(subject.Nearby(seedCellID+1000, 4)).To(ContainCells(
+			1317624576600000761,
+			1317624576600000785,
+			1317624576600000753,
+			1317624576600000793,
+		))
+
+		Expect(subject.Nearby(1317624576600000059, 4)).To(ContainCells(
+			1317624576600000057,
+			1317624576600000049,
+			1317624576600000033,
+			1317624576600000073,
+		))
 	})
 
 	It("should reject invalid cell IDs", func() {
@@ -217,13 +235,13 @@ func BenchmarkReader_Nearby(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			cellID := seedCellID + s2.CellID((i%numRecords)*8)
-			items, err := r.Nearby(cellID, limit)
+			rs, err := r.Nearby(cellID, limit)
 			if err != nil {
 				b.Fatal(err)
-			} else if n := len(items); n != limit {
+			} else if n := rs.Len(); n != limit {
 				b.Fatalf("unable to iterate across %d, expected %d entries but got %d", cellID, limit, n)
 			}
-			items.Release()
+			rs.Release()
 		}
 	}
 

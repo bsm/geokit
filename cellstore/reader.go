@@ -39,7 +39,7 @@ func (r *Reader) FindSection(cellID s2.CellID) (*SectionIterator, error) {
 
 // Nearby returns a limited iterator over close to cellID.
 // Please note that the iterator entries are not sorted.
-func (r *Reader) Nearby(cellID s2.CellID, limit int) (NearbySlice, error) {
+func (r *Reader) Nearby(cellID s2.CellID, limit int) (*NearbyRS, error) {
 	iter, err := r.FindSection(cellID)
 	if err != nil {
 		return nil, err
@@ -47,21 +47,20 @@ func (r *Reader) Nearby(cellID s2.CellID, limit int) (NearbySlice, error) {
 	defer iter.Release()
 
 	numEntries := limit + 4
-	entries := makeNearbySlice(2 * numEntries)
+	rs := newNearbyRS()
 	origin := cellID.Point()
 
 	// count number of records left and right of pivot
-	var left, right int
+	var nleft, nright int
 
 ForwardLoop:
 	for {
 		for iter.Next() {
 			cID := iter.CellID()
-			entries = append(entries,
-				NearbyEntry{CellID: cID, Distance: cID.Point().Distance(origin)})
+			rs.add(cID, iter.Value(), cID.Point().Distance(origin))
 			if cID < cellID {
-				left++
-			} else if right++; right >= numEntries {
+				nleft++
+			} else if nright++; nright >= numEntries {
 				break ForwardLoop
 			}
 		}
@@ -75,12 +74,11 @@ ForwardLoop:
 ReverseLoop:
 	for iter.PrevSection() {
 		for iter.Next() {
-			ent := iter.CellID()
-			entries = append(entries,
-				NearbyEntry{CellID: ent, Distance: ent.Point().Distance(origin)})
-			if ent >= cellID {
-				right++
-			} else if left++; left >= numEntries {
+			cID := iter.CellID()
+			rs.add(cID, iter.Value(), cID.Point().Distance(origin))
+			if cID >= cellID {
+				nright++
+			} else if nleft++; nleft >= numEntries {
 				break ReverseLoop
 			}
 		}
@@ -89,8 +87,9 @@ ReverseLoop:
 		return nil, err
 	}
 
-	entries.Sort()
-	return entries.limit(limit), nil
+	rs.sort()
+	rs.limit(limit)
+	return rs, nil
 }
 
 // --------------------------------------------------------------------
