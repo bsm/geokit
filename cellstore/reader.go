@@ -46,7 +46,7 @@ func (r *Reader) Nearby(cellID s2.CellID, limit int) (*NearbyRS, error) {
 	}
 	defer iter.Release()
 
-	numEntries := limit + 4
+	numEntries := limit + 8
 	rs := newNearbyRS()
 	origin := cellID.Point()
 

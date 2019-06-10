@@ -117,10 +117,10 @@ var _ = Describe("Reader", func() {
 		))
 
 		Expect(subject.Nearby(seedCellID+1000, 4)).To(ContainCells(
+			1317624576600000777,
+			1317624576600000769,
 			1317624576600000761,
 			1317624576600000785,
-			1317624576600000753,
-			1317624576600000793,
 		))
 
 		Expect(subject.Nearby(1317624576600000059, 4)).To(ContainCells(
