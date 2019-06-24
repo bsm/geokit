@@ -1,16 +1,9 @@
 package geo
 
 import (
-	"encoding/binary"
-	"io"
-
 	"github.com/golang/geo/r3"
 	"github.com/golang/geo/s2"
 )
-
-func binWrite(w io.Writer, v interface{}) error {
-	return binary.Write(w, binary.LittleEndian, v)
-}
 
 // EdgeIntersection returns the intersection point between the edges (a-b)
 // and (c-d).
