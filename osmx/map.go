@@ -10,6 +10,9 @@ import (
 	"github.com/golang/geo/s2"
 )
 
+// ErrNoRelations is returned on map without relations decoding/wrapping.
+var ErrNoRelations = errors.New("osmx: map contains no relations")
+
 // Map wraps osm.Map.
 type Map struct {
 	*osm.Map
@@ -29,7 +32,7 @@ func Decode(r io.Reader) (*Map, error) {
 // for further processing.
 func WrapMap(parent *osm.Map) (*Map, error) {
 	if len(parent.Relations) == 0 {
-		return nil, errors.New("osmx: map contains no relations")
+		return nil, ErrNoRelations
 	}
 
 	// Get first relation that has ways
