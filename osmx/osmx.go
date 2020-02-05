@@ -105,8 +105,8 @@ func (l *Line) reversePath() []*osm.Node {
 type lineMap map[int64]*Line
 
 // Loops constructs geo.Loop objects from the lineMap.
-func (m lineMap) Loops() ([]s2.Loop, error) {
-	var res []s2.Loop
+func (m lineMap) Loops() ([]*s2.Loop, error) {
+	var res []*s2.Loop
 
 	lns, err := m.lines()
 	if err != nil {
@@ -115,7 +115,7 @@ func (m lineMap) Loops() ([]s2.Loop, error) {
 
 	for _, ln := range lns {
 		if ln.Role == "outer" {
-			res = append(res, *ln.Loop())
+			res = append(res, ln.Loop())
 		}
 	}
 	return res, nil

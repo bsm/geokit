@@ -50,5 +50,4 @@ var _ = Describe("Map", func() {
 		Expect(subject.Tag("ISO3166-1:alpha2")).To(Equal("GB"))
 		Expect(subject.Tag("notfound")).To(Equal(""))
 	})
-
 })

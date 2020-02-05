@@ -86,7 +86,7 @@ func (m *Map) FindWay(id int64) (*osm.Way, error) {
 }
 
 // ExtractLoops extracts and generates (outer) loops from the map.
-func (m *Map) ExtractLoops() ([]s2.Loop, error) {
+func (m *Map) ExtractLoops() ([]*s2.Loop, error) {
 	ml, err := m.makeLineMap()
 	if err != nil {
 		return nil, err
