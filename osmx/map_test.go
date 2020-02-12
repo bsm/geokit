@@ -1,7 +1,11 @@
 package osmx
 
 import (
+	"compress/gzip"
+	"os"
+
 	osm "github.com/glaslos/go-osm"
+	"github.com/golang/geo/s2"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -50,4 +54,30 @@ var _ = Describe("Map", func() {
 		Expect(subject.Tag("ISO3166-1:alpha2")).To(Equal("GB"))
 		Expect(subject.Tag("notfound")).To(Equal(""))
 	})
+
+	It("should extract loops", func() {
+		Expect(extractLoops("testdata/AD.osm.gz")).To(HaveLen(1))
+		Expect(extractLoops("testdata/AG.osm.gz")).To(HaveLen(4))
+	})
 })
+
+func extractLoops(fname string) ([]*s2.Loop, error) {
+	f, err := os.Open(fname)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	z, err := gzip.NewReader(f)
+	if err != nil {
+		return nil, err
+	}
+	defer z.Close()
+
+	m, err := Decode(z)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.ExtractLoops()
+}

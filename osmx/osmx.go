@@ -6,159 +6,246 @@ import (
 	"math"
 
 	osm "github.com/glaslos/go-osm"
+	"github.com/golang/geo/s1"
 	"github.com/golang/geo/s2"
 )
 
-// Line denotes a Path that may or may not be closed.
-type Line struct {
+// wayPath denotes a chain of Nodes that may or may not be closed.
+type wayPath struct {
 	Role string
 	Path []*osm.Node
 }
 
+// First returns the first node.
+func (w *wayPath) First() *osm.Node { return w.Path[0] }
+
+// Last returns the last node.
+func (w *wayPath) Last() *osm.Node { return w.Path[len(w.Path)-1] }
+
 // FirstID returns the first node ID.
-func (l *Line) FirstID() int64 { return l.Path[0].ID }
+func (w *wayPath) FirstID() int64 { return w.First().ID }
 
 // LastID returns the last node ID.
-func (l *Line) LastID() int64 { return l.Path[len(l.Path)-1].ID }
+func (w *wayPath) LastID() int64 { return w.Last().ID }
 
-// IsRing denotes whether the line's Path is closed.
-func (l *Line) IsRing() bool { return l.Path[0].ID == l.Path[len(l.Path)-1].ID }
+// IsClosed denotes whether the Path is closed.
+func (w *wayPath) IsClosed() bool { return w.FirstID() == w.LastID() }
 
-// IsValid denotes whether the line is valid.
-func (l *Line) IsValid() bool { return len(l.Path) != 0 && l.Role != "" }
+// IsValid denotes whether the way is valid.
+func (w *wayPath) IsValid() bool { return len(w.Path) > 1 && (w.Role == "outer" || w.Role == "inner") }
 
-// Merge joins together l and o if possible and returns whether
-// the lines were merged.
-func (l *Line) Merge(o *Line) bool {
-	isChanged := true
-
-	if l.LastID() == o.FirstID() {
-		// l: a b c d
-		// o: d e f g
-		// l+o -> a b c d e f g
-		l.Path = append(l.Path, o.Path[1:]...)
-	} else if l.FirstID() == o.LastID() {
-		// l: d e f g
-		// o: a b c d
-		// o+l -> a b c d e f g
-		l.Path = append(o.Path, l.Path[1:]...)
-	} else if l.FirstID() == o.FirstID() {
-		// l: d c b a
-		// o: d e f g
-		// rev(l)+o -> a b c d e f g
-		l.Path = append(l.reversePath(), o.Path[1:]...)
-	} else if l.LastID() == o.LastID() {
-		// l: a b c d
-		// o: g f e d
-		// l+rev(o) -> a b c d e f g
-		l.Path = append(l.Path, o.reversePath()[1:]...)
-	} else {
-		isChanged = false
+// EdgeMerge merges o onto w if both ways have a common edge. It returns true
+// if the merge was successful.
+func (w *wayPath) EdgeMerge(o *wayPath) bool {
+	if w.Role != o.Role {
+		return false
 	}
 
-	return isChanged
+	merged := true
+	if w.LastID() == o.FirstID() {
+		// w: a b c d
+		// o: d e f g
+		// w+o -> a b c d e f g
+		w.Path = append(w.Path, o.Path[1:]...)
+	} else if w.FirstID() == o.LastID() {
+		// w: d e f g
+		// o: a b c d
+		// o+w -> a b c d e f g
+		w.Path = append(o.Path, w.Path[1:]...)
+	} else if w.FirstID() == o.FirstID() {
+		// w: d c b a
+		// o: d e f g
+		// rev(w)+o -> a b c d e f g
+		w.Path = append(w.reversePath(), o.Path[1:]...)
+	} else if w.LastID() == o.LastID() {
+		// w: a b c d
+		// o: g f e d
+		// w+rev(w) -> a b c d e f g
+		w.Path = append(w.Path, o.reversePath()[1:]...)
+	} else {
+		merged = false
+	}
+
+	return merged
 }
 
 // Loop constructs an s2.Loop object
 // from the path. It returns an empty Loop
 // if the line is not closed.
-func (l *Line) Loop() *s2.Loop {
-	if len(l.Path) < 4 || !l.IsValid() || !l.IsRing() {
-		return s2.EmptyLoop()
+func (w *wayPath) Loop() (*s2.Loop, error) {
+	if !w.IsValid() {
+		return nil, fmt.Errorf("osmx: cannot build loop from an invalid way")
+	} else if !w.IsClosed() {
+		return nil, fmt.Errorf("osmx: cannot build loop from an open way")
 	}
 
 	var pts []s2.Point
 	// Discard first node as s2.Loop implicitly assumes Loops are closed.
-	// First and last nodes are identical.
-	for _, nd := range l.Path[1:] {
+	// First and last nodes are identicaw.
+	for _, nd := range w.Path[1:] {
 		pts = append(pts, s2.PointFromLatLng(s2.LatLngFromDegrees(nd.Lat, nd.Lng)))
 	}
 	// Check the direction of the points and
 	// reverse the direction if clockwise.
-	lp := s2.LoopFromPoints(pts)
+	loop := s2.LoopFromPoints(pts)
 	// The loop is assumed clockwise
 	// if its bounding rectangle is over
 	// 50% of the unit sphere's
 	// surface area. No country exceeds this.
 	// NOTE: Complex loops' orientations
 	// cannot be determined with s2.RobustSign.
-	if lp.RectBound().Area() >= 2*math.Pi {
+	if loop.RectBound().Area() >= 2*math.Pi {
 		poly := s2.Polyline(pts)
 		poly.Reverse()
 		// Reinitiate loop for initOriginAndBound()
-		lp = s2.LoopFromPoints(pts)
+		loop = s2.LoopFromPoints(pts)
 	}
 
-	return lp
+	return loop, nil
 }
 
-func (l *Line) reversePath() []*osm.Node {
-	for i, j := 0, len(l.Path)-1; i < j; i, j = i+1, j-1 {
-		l.Path[i], l.Path[j] = l.Path[j], l.Path[i]
+// ForceMerge merges o onto w using one of the following modes. Example:
+//
+//   w: a b c
+//   o: d e f
+//
+//   w.ForceMerge(o, 1) => a b c d e f
+//   w.ForceMerge(o, 2) => d e f a b c
+//   w.ForceMerge(o, 3) => c b a d e f
+//   w.ForceMerge(o, 4) => a b c f e d
+func (w *wayPath) ForceMerge(o *wayPath, mode int) {
+	if w.Role != o.Role {
+		return
 	}
 
-	return l.Path
+	switch mode {
+	case 1:
+		w.Path = append(w.Path, o.Path...)
+	case 2:
+		w.Path = append(o.Path, w.Path...)
+	case 3:
+		w.Path = append(w.reversePath(), o.Path...)
+	case 4:
+		w.Path = append(w.Path, o.reversePath()...)
+	}
 }
 
-// --------------------------------------------------
-
-type lineMap map[int64]*Line
-
-// Loops constructs geo.Loop objects from the lineMap.
-func (m lineMap) Loops() ([]*s2.Loop, error) {
-	var res []*s2.Loop
-
-	lns, err := m.lines()
-	if err != nil {
-		return nil, err
+// MinEdgeDistance returns the minimum distance between the edges of two ways.
+func (w *wayPath) MinEdgeDistance(o *wayPath) (min s1.Angle, mode int) {
+	min = s1.InfAngle()
+	if w.Role != o.Role {
+		return min, mode
 	}
 
-	for _, ln := range lns {
-		if ln.Role == "outer" {
-			res = append(res, ln.Loop())
+	w1 := s2.PointFromLatLng(s2.LatLngFromDegrees(w.First().Lat, w.First().Lng))
+	w2 := s2.PointFromLatLng(s2.LatLngFromDegrees(w.Last().Lat, w.Last().Lng))
+
+	o1 := s2.PointFromLatLng(s2.LatLngFromDegrees(o.First().Lat, o.First().Lng))
+	o2 := s2.PointFromLatLng(s2.LatLngFromDegrees(o.Last().Lat, o.Last().Lng))
+
+	if d := w2.Distance(o1); d < min {
+		min, mode = d, 1
+	}
+	if d := w1.Distance(o2); d < min {
+		min, mode = d, 2
+	}
+	if d := w1.Distance(o1); d < min {
+		min, mode = d, 3
+	}
+	if d := w2.Distance(o2); d < min {
+		min, mode = d, 4
+	}
+	return min, mode
+}
+
+// Reverse node order.
+func (w *wayPath) reversePath() []*osm.Node {
+	for i, j := 0, len(w.Path)-1; i < j; i, j = i+1, j-1 {
+		w.Path[i], w.Path[j] = w.Path[j], w.Path[i]
+	}
+
+	return w.Path
+}
+
+// --------------------------------------------------------------------
+
+type waySlice []*wayPath
+
+// Reduce reduces ways to continuous loops by joining them together. Destructive!
+func (s waySlice) Reduce() waySlice {
+	// find simple loops by merging edges
+	for i, w := range s {
+		if w != nil {
+			s.mergeEdges(w, i+1)
 		}
 	}
-	return res, nil
+	s = s.compact(false)
+
+	// open loops
+	for i, w := range s {
+		if w != nil && !w.IsClosed() {
+			s.mergeOpen(w, i+1)
+		}
+	}
+	return s.compact(true)
 }
 
-func (m lineMap) lines() ([]*Line, error) {
-	var lns []*Line
-
-	for id, line := range m {
-		delete(m, id)
-
-		// try build a ring if line is just a segment
-		if !line.IsRing() {
-			m.expand(line)
-			// fail if line is still not a ring
-			if !line.IsRing() {
-				return nil, fmt.Errorf("osmx: cannot build ring for way #%d", id)
+// removes all nils
+func (s waySlice) compact(close bool) waySlice {
+	clean := s[:0]
+	for _, w := range s {
+		if w != nil {
+			if close && !w.IsClosed() {
+				w.Path = append(w.Path, w.Path[0])
 			}
+			clean = append(clean, w)
 		}
-
-		lns = append(lns, line)
 	}
-
-	return lns, nil
+	return clean
 }
 
-func (m lineMap) expand(ln *Line) {
-	grown := false
-
-	for id, mapLn := range m {
-		if ln.Role != mapLn.Role {
+func (s waySlice) mergeEdges(w *wayPath, off int) {
+	merged := false
+	for i, x := range s[off:] {
+		if x == nil {
 			continue
 		}
 
-		if ln.Merge(mapLn) {
-			// Remove all references to this after it's merged so they aren't called during the iteration.
-			delete(m, id)
-			grown = true
+		if w.EdgeMerge(x) {
+			s[i+off] = nil
+			merged = true
 		}
 	}
 
-	if !ln.IsRing() && grown {
-		// Recursively call to join together other matching lines.
-		m.expand(ln)
+	if merged {
+		s.mergeEdges(w, off)
+	}
+}
+
+func (s waySlice) mergeOpen(w *wayPath, off int) {
+	var (
+		pos      = -1
+		mode     = 0
+		distance = s1.InfAngle()
+	)
+
+	for i, x := range s[off:] {
+		if x == nil {
+			continue
+		}
+
+		if !x.IsClosed() {
+			if d, m := w.MinEdgeDistance(x); d < distance {
+				distance = d
+				mode = m
+				pos = i
+			}
+		}
+	}
+
+	if pos > -1 {
+		w.ForceMerge(s[off+pos], mode)
+		s[off+pos] = nil
+		s.mergeOpen(w, off)
 	}
 }

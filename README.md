@@ -7,6 +7,6 @@
 
 Toolkit for calculations and spatial indexes.
 
-### Documentation
+## Documentation
 
 Full documentation is available on [GoDoc](http://godoc.org/github.com/bsm/geokit)
