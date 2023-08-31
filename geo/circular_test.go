@@ -3,8 +3,8 @@ package geo
 import (
 	"github.com/golang/geo/s2"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	. "github.com/bsm/ginkgo/v2"
+	. "github.com/bsm/gomega"
 )
 
 var _ = Describe("circularLoop", func() {

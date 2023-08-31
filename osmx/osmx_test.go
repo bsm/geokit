@@ -3,11 +3,10 @@ package osmx
 import (
 	"testing"
 
+	. "github.com/bsm/ginkgo/v2"
+	. "github.com/bsm/gomega"
 	osm "github.com/glaslos/go-osm"
 	"github.com/golang/geo/s2"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/ginkgo/extensions/table"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("wayPath", func() {

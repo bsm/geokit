@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/bsm/geokit/cellstore"
+	. "github.com/bsm/ginkgo/v2"
+	. "github.com/bsm/gomega"
 	"github.com/bsm/sntable"
 	"github.com/golang/geo/s2"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 func TestSuite(t *testing.T) {
