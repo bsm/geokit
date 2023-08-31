@@ -1,7 +1,0 @@
-language: go
-go:
-  - 1.13.x
-install:
-  - go get honnef.co/go/tools/cmd/staticcheck
-script:
-  - make default staticcheck
