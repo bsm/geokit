@@ -3,7 +3,6 @@ package cellstore_test
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"testing"
@@ -46,7 +45,7 @@ func seedInMem(numRecords int) *cellstore.Reader {
 }
 
 func createSeeds(numRecords int, compression sntable.Compression) (string, error) {
-	f, err := ioutil.TempFile("", "cellstore-bench")
+	f, err := os.CreateTemp("", "cellstore-bench")
 	if err != nil {
 		return "", err
 	}
