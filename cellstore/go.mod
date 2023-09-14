@@ -1,6 +1,6 @@
 module github.com/bsm/geokit/cellstore
 
-go 1.18
+go 1.20
 
 require (
 	github.com/bsm/extsort v0.6.1
@@ -13,7 +13,6 @@ require (
 require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/klauspost/compress v1.16.7 // indirect
-	golang.org/x/net v0.0.0-20190603091049-60506f45cf65 // indirect
-	golang.org/x/sys v0.0.0-20190602015325-4c4f7f33c9ed // indirect
-	golang.org/x/text v0.3.2 // indirect
+	golang.org/x/net v0.7.0 // indirect
+	golang.org/x/sys v0.12.0 // indirect
 )
